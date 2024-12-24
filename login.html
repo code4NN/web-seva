@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+
+    <title>Login Page</title>
+
+    <!-- Link to Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS for additional styling -->
+    <style>
+        /* Additional custom styles for the login form */
+        body {
+            /* background-color: #f8f9fa; */
+            background-color: #fcba03;
+            font-family: Arial, sans-serif;
+        }
+
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+
+        h3 {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+
+        input:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.2rem rgba(38, 143, 255, 0.25);
+        }
+
+        button {
+            background-color: #007bff;
+            border: none;
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .alert {
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        /* Responsive design */
+        .container {
+            max-width: 100%;
+            width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                background-color: #03a9fc;
+                font-family: Arial, sans-serif;
+            }
+
+            .container {
+                width: 100%;
+                padding: 10px;
+            }
+
+            .card {
+                width: 100%;
+                padding: 20px;
+            }
+
+            h3 {
+                font-size: 1.25rem;
+            }
+        }
+
+
+        /* Spinner overlay styles */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1050;
+        }
+    </style>
+</head>
+
+<body>
+
+
+
+    <div id="app" class="container d-flex justify-content-center align-items-center min-vh-100">
+        
+        <!-- Login Form -->
+        <div v-if="!loggedIn" class="card p-4">
+            <h3 class="text-center mb-4">User Login</h3>
+            
+            <form @submit.prevent="handleLogin">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input v-model="username" type="text" id="username" class="form-control"
+                        placeholder="Enter username" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input v-model="password" type="password" id="password" class="form-control"
+                        placeholder="Enter password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Login</button>
+            </form>
+            <div v-if="errorMessage" class="mt-3 alert alert-danger">{{ errorMessage }}</div>
+        </div>
+
+        
+        <!-- Welcome Page (after login) -->
+        <div v-if="loggedIn" class="card p-4">
+            <h3 class="text-center mb-4">Welcome, {{ username }}</h3>
+            <button @click="logout" class="btn btn-danger w-100">Re-login</button>
+        </div>
+
+        <!-- Spinner Overlay -->
+        <div v-if="isLoading" class="overlay">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-white">Validating your credentials...</p>
+            </div>
+        </div>
+
+
+        <!-- Vue.js -->
+        <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47/dist/vue.global.prod.js"></script>
+
+        <script>
+            const { createApp, ref } = Vue;
+
+            createApp({
+                setup() {
+                    const username = ref('');
+                    const password = ref('');
+                    const errorMessage = ref('');
+                    const loggedIn = ref(false);
+                    const isLoading = ref(false);
+
+                    // Check if user is already logged in from localStorage
+                    if (localStorage.getItem('username') && localStorage.getItem('password')) {
+                        username.value = localStorage.getItem('username');
+                        password.value = localStorage.getItem('password');
+                        loggedIn.value = true;
+                    }
+
+                    // Handle login
+                    const handleLogin = () => {
+                        isLoading.value = true; // Show spinner
+                        google.script.run.withSuccessHandler((response) => {
+                            if (response.result === 'valid') {
+                                // Successfully logged in
+                                errorMessage.value = '';
+                                // Store login credentials in localStorage
+                                localStorage.setItem('username', username.value);
+                                localStorage.setItem('password', password.value);
+                                loggedIn.value = true;
+                                isLoading.value = false;
+
+                                // redirect to filling page
+                                // BASE_URL is sent by server.. GAS doGET
+                                newpageURL = `${BASE_URL}?page=filling`;
+                                window.open(newpageURL, "_blank")
+
+                            } else {
+                                // Invalid username or password
+                                errorMessage.value = response.result_msg;
+                                isLoading.value = false;
+                            }
+                        }).withFailureHandler(() => {
+                            errorMessage.value = 'An error occurred during login.';
+                            isLoading.value = false;
+                        }).checkUserCredentials(username.value, password.value)
+
+                    };
+
+                    // Handle logout and clear localStorage
+                    const logout = () => {
+                        localStorage.removeItem('username');
+                        localStorage.removeItem('password');
+                        loggedIn.value = false;
+                        username.value = '';
+                        password.value = '';
+                    };
+
+                    return {
+                        username,
+                        password,
+                        errorMessage,
+                        loggedIn,
+                        isLoading,
+                        handleLogin,
+                        logout
+                    };
+                }
+            }).mount('#app');
+        </script>
+</body>
+
+</html>
