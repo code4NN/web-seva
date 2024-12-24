@@ -109,8 +109,8 @@
             <div class="d-flex flex-wrap justify-content-center mt-4 gap-4">
                 <!-- Render Buttons -->
                 <button v-for="weekday in weekdayList" :key="weekday.label" type="button"
-                    class="btn btn-primary mx-2 responsive-btn" :class="{ 'btn-success': selectedDay.label === weekday.label }"
-                    @click="selectDay(weekday)">
+                    class="btn btn-primary mx-2 responsive-btn"
+                    :class="{ 'btn-success': selectedDay.label === weekday.label }" @click="selectDay(weekday)">
                     {{ weekday.label }}
                 </button>
             </div>
@@ -118,61 +118,97 @@
 
             <!-- Daily Form -->
             <h3 class="mt-3">Fill for {{selectedDay.label}}</h3>
-            
-            <div v-if="selectedDay.day" class="card p-4">
-                <!-- Body Section -->
-                <h5>Body</h5>
-                <div class="mb-3">
-                    <label for="wakeUpTime" class="form-label">Wake Up Time</label>
-                    <input type="time" id="wakeUpTime" class="form-control" v-model="form.body.wakeUp" />
-                </div>
-                <div class="mb-3">
-                    <label for="dayRest" class="form-label">Day Rest (mins)</label>
-                    <input type="number" id="dayRest" class="form-control" v-model="form.body.dayRest" />
-                </div>
-                <div class="mb-3">
-                    <label for="bedTime" class="form-label">Bed Time</label>
-                    <input type="time" id="bedTime" class="form-control" v-model="form.body.bedTime" />
-                </div>
 
-                <!-- Soul Section -->
-                <h5>Soul</h5>
-                <div class="form-check mb-2" v-for="mp in soulOptions" :key="mp">
-                    <input type="checkbox" class="form-check-input" :id="mp" v-model="form.soul.mps" :value="mp" />
-                    <label :for="mp" class="form-check-label">{{ mp }}</label>
-                </div>
-                <div class="mb-3">
-                    <label for="hearing" class="form-label">Hearing (mins)</label>
-                    <input type="number" id="hearing" class="form-control" v-model="form.soul.hearing" />
-                </div>
-                <div class="mb-3">
-                    <label for="reading" class="form-label">Reading (mins)</label>
-                    <input type="number" id="reading" class="form-control" v-model="form.soul.reading" />
-                </div>
-                <div class="mb-3">
-                    <label for="shloka" class="form-label">Shloka (number)</label>
-                    <input type="number" id="shloka" class="form-control" v-model="form.soul.shloka" />
-                </div>
+            <form>
+                <div v-if="selectedDay.label" class="card p-4 mx-auto" style="max-width: 800px;">
+                    <!-- Body Section -->
+                    <h5>Body</h5>
+                    <div class="d-flex justify-content-between gap-3 mb-4">
+                        <div class="flex-grow-1"> <!-- added px-2 for padding -->
+                            <label for="wakeUpTime" class="form-label">Wake Up</label>
+                            <input type="time" id="wakeUpTime" class="form-control" v-model="form.body.wakeUp"
+                                required />
+                        </div>
+                        <div class="flex-grow-1"> <!-- added px-2 for padding -->
+                            <label for="dayRest" class="form-label">Day Rest</label>
+                            <input type="number" id="dayRest" class="form-control" v-model="form.body.dayRest"
+                                required />
+                        </div>
+                        <div class="flex-grow-1"> <!-- added px-2 for padding -->
+                            <label for="bedTime" class="form-label">Bed Time</label>
+                            <input type="time" id="bedTime" class="form-control" v-model="form.body.bedTime" required />
+                        </div>
+                    </div>
 
-                <!-- Study Section -->
-                <h5>Study</h5>
-                <div class="mb-3">
-                    <label for="selfStudy" class="form-label">Self Study (mins)</label>
-                    <input type="number" id="selfStudy" class="form-control" v-model="form.study.selfStudy" />
-                </div>
-                <div class="mb-3">
-                    <label for="college" class="form-label">College Classes</label>
-                    <select id="college" class="form-select" v-model="form.study.college">
-                        <option disabled value="">Select...</option>
-                        <option>Attended All</option>
-                        <option>Missed 1</option>
-                        <option>Missed 2</option>
-                    </select>
-                </div>
 
-                <!-- Submit Button -->
-                <button class="btn btn-success w-100" @click="handleSubmit">Submit</button>
-            </div>
+                    <!-- Soul Section -->
+                    <h5>Soul</h5>
+                    <div class="form-check mb-2" v-for="(checked, key) in form.soul.mp" :key="key">
+                        <input type="checkbox" class="form-check-input" :id="key" v-model="form.soul.mp[key]" />
+                        <label :for="key" class="form-check-label">{{ key.toUpperCase() }}</label>
+                    </div>
+                    <div class="d-flex justify-content-between gap-3 mb-3">
+                        <div class="flex-grow-1">
+                            <label for="SPHearing" class="form-label">SP Hearing (mins)</label>
+                            <input type="number" id="SPHearing" class="form-control" v-model="form.soul.hearing.SP" />
+                        </div>
+                        <div class="flex-grow-1">
+                            <label for="GMHearing" class="form-label">GM Hearing (mins)</label>
+                            <input type="number" id="GMHearing" class="form-control" v-model="form.soul.hearing.GM" />
+                        </div>
+                        <div class="flex-grow-1">
+                            <label for="HGRSPHearing" class="form-label">HGRSP Hearing (mins)</label>
+                            <input type="number" id="HGRSPHearing" class="form-control"
+                                v-model="form.soul.hearing.HGRSP" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="hearingOther" class="form-label">Other Hearing</label>
+                        <textarea id="hearingOther" class="form-control" rows="3"
+                            v-model="form.soul.hearing.other"></textarea>
+                    </div>
+                    <div class="d-flex justify-content-between gap-3 mb-3">
+                        <div class="flex-grow-1">
+                            <label for="SPReading" class="form-label">SP Reading (mins)</label>
+                            <input type="number" id="SPReading" class="form-control" v-model="form.soul.reading.SPB" />
+                        </div>
+                        <div class="flex-grow-1">
+                            <label for="AboutSPReading" class="form-label">About SP Reading (mins)</label>
+                            <input type="number" id="AboutSPReading" class="form-control"
+                                v-model="form.soul.reading.aboutSP" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="readingOther" class="form-label">Other Reading</label>
+                        <textarea id="readingOther" class="form-control" rows="3"
+                            v-model="form.soul.reading.other"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="shloka" class="form-label">Shloka (number)</label>
+                        <input type="number" id="shloka" class="form-control" v-model="form.soul.shloka" />
+                    </div>
+
+                    <!-- Study Section -->
+                    <h5>Study</h5>
+                    <div class="mb-3">
+                        <label for="selfStudy" class="form-label">Self Study (mins)</label>
+                        <input type="number" id="selfStudy" class="form-control" v-model="form.study.selfStudy" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="college" class="form-label">College Classes</label>
+                        <select id="college" class="form-select" v-model="form.study.college">
+                            <option disabled value="">Select...</option>
+                            <option>Attended All</option>
+                            <option>Missed 1</option>
+                            <option>Missed 2</option>
+                        </select>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button class="btn btn-success w-100" @click="handleSubmit">Submit</button>
+                </div>
+            </form>
+
         </div>
     </div>
 
@@ -201,7 +237,7 @@
                         { label: 'Fri', daygap: 4, status: 'future' },
                         { label: 'Sat', daygap: 5, status: 'future' },
                         { label: 'Sun', daygap: 6, status: 'future' }],
-                    selectedDay: {label:null,daygap:null,status:null},
+                    selectedDay: { label: null, daygap: null, status: null },
 
                     form: {
                         body: { wakeUp: '', dayRest: '', bedTime: '' },
