@@ -27,6 +27,22 @@
             align-items: center;
         }
 
+        .responsive-btn {
+            flex: 1 1 calc(14% - 1rem);
+            /* Responsive: 7 buttons evenly spaced */
+            min-width: 80px;
+            /* Minimum button size for smaller screens */
+            max-width: 120px;
+            /* Cap button size */
+            text-align: center;
+            /* Center align text */
+        }
+
+        .btn-success {
+            border: 2px solid yellow;
+            /* Optional: Highlight the selected button */
+        }
+
 
         .day-card {
             transition: all 0.3s ease;
@@ -89,21 +105,21 @@
             </div>
 
             <!-- Weekly Overview -->
-            <h3>Select a Day</h3>
-            <div class="d-flex flex-wrap justify-content-center gap-2"></div>
-
-                <div v-for="(day, index) in days" :key="index" class="card text-center"
-                    class="['day-card' getDayCardClass(day) {highlighted-day: selectedDay==day}]"
-                    @click="selectDay(day)" style="width: 120px; cursor: pointer;">
-                    <div class="card-body">
-                        <h6>{{ day.label }}</h6>
-                    </div>
-                </div>
+            <h3 class="mt-3">Choose a day from {{active_week}} </h3>
+            <div class="d-flex flex-wrap justify-content-center mt-4 gap-4">
+                <!-- Render Buttons -->
+                <button v-for="weekday in weekdayList" :key="weekday.label" type="button"
+                    class="btn btn-primary mx-2 responsive-btn" :class="{ 'btn-success': selectedDay.label === weekday.label }"
+                    @click="selectDay(weekday)">
+                    {{ weekday.label }}
+                </button>
             </div>
 
+
             <!-- Daily Form -->
-            <h3>Daily Inputs: {{ selectedDay?.label }}</h3>
-            <div v-if="selectedDay" class="card p-4">
+            <h3 class="mt-3">Fill for {{selectedDay.label}}</h3>
+            
+            <div v-if="selectedDay.day" class="card p-4">
                 <!-- Body Section -->
                 <h5>Body</h5>
                 <div class="mb-3">
@@ -171,49 +187,57 @@
         const app = Vue.createApp({
             data() {
                 return {
+                    // the client side database..
                     isLoggedIn: true,
 
                     week_list: ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"], // Full list of weeks
                     active_week: null,
 
-                    days: [
-                        { label: 'Mon', status: 'red' },
-                        { label: 'Tue', status: 'red' },
-                        { label: 'Wed', status: 'red' },
-                        { label: 'Thu', status: 'red' },
-                        { label: 'Fri', status: 'gray' },
-                        { label: 'Sat', status: 'gray' },
-                        { label: 'Sun', status: 'gray' },
-                    ],
-                    selectedDay: null,
+                    weekdayList: [
+                        { label: 'Mon', daygap: 0, status: 'future' },
+                        { label: 'Tue', daygap: 1, status: 'future' },
+                        { label: 'Wed', daygap: 2, status: 'future' },
+                        { label: 'Thu', daygap: 3, status: 'future' },
+                        { label: 'Fri', daygap: 4, status: 'future' },
+                        { label: 'Sat', daygap: 5, status: 'future' },
+                        { label: 'Sun', daygap: 6, status: 'future' }],
+                    selectedDay: {label:null,daygap:null,status:null},
+
                     form: {
                         body: { wakeUp: '', dayRest: '', bedTime: '' },
-                        soul: { mps: [], hearing: '', reading: '', shloka: '' },
+                        soul: {
+                            mp: {
+                                sa: false, mc: false, ma: false,
+                                japa: ''
+                            },
+                            hearing: { SP: '', GM: '', HGRSP: '', other: '' },
+                            reading: { SPB: '', aboutSP: '', other: '' },
+                            shloka: ''
+                        },
                         study: { selfStudy: '', college: '' },
-                    },
-                    soulOptions: ['SA', 'MC', 'MA', 'Japa'],
+                    }
                 };
             },
 
             computed: {
+                // derived variables basis the data
+
                 visibleWeeks() {
                     // Select the last 3 weeks from the list
                     return this.week_list.slice(-3);
                 },
             },
             methods: {
+                // helper functions to do various actions..callbacks
+
                 activateWeek(week) {
-                    this.active_week = week; // Update the active week
+                    this.active_week = week;
                 },
 
                 selectDay(day) {
-                    this.selectedDay = day;
+                    this.selectedDay = day
                 },
-                getDayCardClass(day) {
-                    if (day.status === 'red') return 'bg-danger text-white';
-                    if (day.status === 'green') return 'bg-success text-white';
-                    return 'bg-secondary text-white';
-                },
+
                 handleSubmit() {
                     alert('Form submitted successfully!');
                     this.resetForm();
@@ -227,9 +251,11 @@
                 },
             },
 
-            created(){
-                var week_list = this.week_list                
-                if (week_list.length > 0){this.active_week = week_list[week_list.length-1]}
+            created() {
+                // this section runs after the vue instance is created 
+                // and before it is mounted to the DOM
+                var week_list = this.week_list
+                if (week_list.length > 0) { this.active_week = week_list[week_list.length - 1] }
             }
         });
 
