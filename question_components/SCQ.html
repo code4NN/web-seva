@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Page</title>
+    <script src="https://unpkg.com/vue@3"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script> -->
+
+    <!-- Global Styles -->
+    <style>
+        /* 🌟 Base Styles */
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #97c4f0;
+            margin: 0;
+            padding: 0;
+        }
+
+        .app-container {
+            max-width: 900px;
+            width: 95%;
+            margin: 20px auto;
+            padding: 20px;
+            background: #ecf4ca;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* 🎨 Styling the whole question block */
+        .question-container {
+            background: #cde4c6;
+            /* Light background */
+            border: 5px solid #007bff;
+            /* Blue border */
+            border-radius: 10px;
+            /* Rounded corners */
+            transition: all 0.3s ease-in-out;
+            /* Smooth transition */
+        }
+
+        /* 🏷️ Styling each option block */
+        .option-container {
+            background: #ffffff;
+            /* White background */
+            border: 5px solid #051c32;
+            /* Light gray border */
+            border-radius: 8px;
+            /* Rounded corners */
+            transition: all 0.3s ease-in-out;
+            /* Smooth transition */
+        }
+
+        /* 🖱️ Hover Effects */
+        .option-container:hover {
+            border-color: #007bff;
+            /* Highlight border on hover */
+            box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);
+            /* Light blue shadow */
+        }
+    </style>
+
+</head>
+
+<body>
+    <div id="app" class="app-container">
+
+        <script>
+            const { ref, reactive, onMounted, computed, onUnmounted } = Vue;
+
+            const SCQ = {
+                props: {
+                    mode: {
+                        type: String,
+                        required: true
+                    },
+                    questionData: {
+                        type: Object,
+                        required: false
+                    },
+                    answerData: {
+                        type: Object,
+                        required: false
+                    }
+                },
+                emits: ['createdQuestion'],
+                setup(props, { emit }) {
+
+                    // for creating the question
+                    const questionTitle = ref('');
+                    const optionList = ref([
+                        { text: '', isCorrect: false },
+                        { text: '', isCorrect: false }
+                    ]);
+
+                    const validationErrors = computed(() => {
+
+                        const error_optionList = [];
+
+                        optionList.value.forEach(element => {
+                            if (element.text.trim().length > 0) {
+                                error_optionList.push("")
+                            }
+                            else {
+                                error_optionList.push("cannot be blank")
+                            }
+
+                        });
+                        // console.log(error_optionList.every(option => option.trim().length > 0))
+
+                        const is_valid = {
+                            questionTitle: questionTitle.value.trim().length > 0 ? "" : "cannot be blank",
+                            options: error_optionList,
+                            valid_overall: error_optionList.every(option => option.trim().length === 0) &&
+                                questionTitle.value.trim().length > 0 &&
+                                optionList.value.filter(option => option.isCorrect).length === 1
+                        }
+                        // update the parent about how is the question looking
+                        emit("createdQuestion", {
+                            is_valid: is_valid.valid_overall,
+                            ...{
+                                title: questionTitle,
+                                optionList: optionList
+                            }
+                        })
+
+                        return {
+                            ...is_valid,
+                            errormsg_overall: optionList.value.filter(option => option.isCorrect).length !== 1 ? "Should have exactly one correct answer" : "some error in question"
+                        }
+                    });
+
+                    // Function to add a new option
+                    const add_option = () => {
+                        optionList.value.push({ text: '', isCorrect: false });
+                    };
+
+                    // Function to remove an option
+                    const remove_option = (index) => {
+                        optionList.value.splice(index, 1);
+                    };
+
+                    // Function to toggle correct option
+                    const toggle_is_correct = (index) => {
+                        optionList.value[index].isCorrect = !optionList.value[index].isCorrect;
+                    };
+
+                    return {
+                        // used while creating the question
+                        questionTitle,
+                        optionList,
+                        add_option, remove_option, toggle_is_correct,
+                        validationErrors
+
+                    };
+                },
+
+                template: `
+
+                {{validationErrors}}
+ <div class="container my-4">
+    <!-- Question Container -->
+    <div class="p-4 border rounded "
+    :class="validationErrors.valid_overall ? 'bg-success-subtle' : 'bg-danger-subtle'">
+        
+        <!-- Question Title -->
+        <div class="mb-4">
+            <label for="questionTitle" class="form-label fw-bold">Question Title</label>
+            <textarea id="questionTitle" v-model="questionTitle" class="form-control" rows="3"
+                placeholder="Enter your question here..."></textarea>
+            <div v-if="validationErrors.questionTitle" class="text-danger">
+                {{ validationErrors.questionTitle }}
+            </div>
+        </div>
+
+        <!-- Option List -->
+        <div v-for="(option, index) in optionList" :key="index" class="p-3 border rounded mb-2"
+            :class="{'border-success bg-success-subtle': option.isCorrect}">
+
+            <!-- Option Input -->
+            <input v-model="option.text" type="text" class="form-control mb-2"
+            placeholder="Enter option text">
+            <div v-if="validationErrors.options[index]" class="text-danger">
+                {{ validationErrors.options[index] }}
+            </div>
+
+            <!-- Buttons (Stacked on Mobile) -->
+            <div class="d-flex flex-column flex-sm-row gap-2">
+                <button class="btn btn-outline-success" @click="toggle_is_correct(index)">
+                    {{ option.isCorrect ? 'Mark incorrect' : 'Mark correct' }}
+                </button>
+                <button v-if="optionList.length>2" class="btn btn-outline-danger" @click="remove_option(index)">
+                    Remove
+                </button>
+            </div>
+        </div>
+
+        <!-- Error for correct option selection  -->
+        <div v-if="!validationErrors.valid_overall" class="text-danger mt-2">
+            {{ validationErrors.errormsg_overall }}
+        </div>
+
+        <!-- Add Option Button -->
+        <button class="btn btn-outline-primary mt-3" @click="add_option">
+            Add Option
+        </button>
+    </div>
+</div>
+  `
+            };
+
+            const app = Vue.createApp({
+                components: {
+                    SCQ
+                },
+                setup() {
+
+                    const allQuestionDict = reactive({ Q1: {} })
+
+                    const handleQuestionCreation = (question_key, created_question_obj) => {
+                        allQuestionDict[question_key] = created_question_obj
+                    };
+
+
+                    return {
+                        allQuestionDict,
+                        handleQuestionCreation
+                    };
+                },
+
+                // main app template
+                template: `
+                hi hello
+                <SCQ :mode="'edit'"
+                @createdQuestion="handleQuestionCreation('Q1',$event)"
+                />
+
+                {{allQuestionDict}}
+                `
+            });
+            app.mount('#app')
+
+
+        </script>
+</body>
+
+</html>

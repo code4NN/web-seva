@@ -56,6 +56,14 @@
             box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
             /* Subtle glow effect */
         }
+
+        .is-invalid {
+            border-color: red;
+        }
+
+        .text-danger {
+            font-size: 0.875rem;
+        }
     </style>
 </head>
 
@@ -119,94 +127,126 @@
             <!-- Daily Form -->
             <h3 class="mt-3">Fill for {{selectedDay.label}}</h3>
 
-            <form>
-                <div v-if="selectedDay.label" class="card p-4 mx-auto" style="max-width: 800px;">
-                    <!-- Body Section -->
-                    <h5>Body</h5>
-                    <div class="d-flex justify-content-between gap-3 mb-4">
-                        <div class="flex-grow-1"> <!-- added px-2 for padding -->
-                            <label for="wakeUpTime" class="form-label">Wake Up</label>
-                            <input type="time" id="wakeUpTime" class="form-control" v-model="form.body.wakeUp"
-                                required />
-                        </div>
-                        <div class="flex-grow-1"> <!-- added px-2 for padding -->
-                            <label for="dayRest" class="form-label">Day Rest</label>
-                            <input type="number" id="dayRest" class="form-control" v-model="form.body.dayRest"
-                                required />
-                        </div>
-                        <div class="flex-grow-1"> <!-- added px-2 for padding -->
-                            <label for="bedTime" class="form-label">Bed Time</label>
-                            <input type="time" id="bedTime" class="form-control" v-model="form.body.bedTime" required />
-                        </div>
+            <form @submit.prevent="handleSubmit">
+                <!-- Body Section -->
+                <h5>Body</h5>
+                <div class="d-flex justify-content-between gap-3 mb-4">
+
+                    <div class="flex-grow-1">
+                        <label for="wakeUpTime" class="form-label">Wake Up</label>
+                        <input type="time" id="wakeUpTime" class="form-control" v-model="dailyForm.body.wakeUp"
+                            :class="{'is-invalid': errors.body.wakeUp}" required />
+                        <div v-if="errors.body.wakeUp" class="text-danger">{{ errors.body.wakeUp }}</div>
                     </div>
 
-
-                    <!-- Soul Section -->
-                    <h5>Soul</h5>
-                    <div class="form-check mb-2" v-for="(checked, key) in form.soul.mp" :key="key">
-                        <input type="checkbox" class="form-check-input" :id="key" v-model="form.soul.mp[key]" />
-                        <label :for="key" class="form-check-label">{{ key.toUpperCase() }}</label>
-                    </div>
-                    <div class="d-flex justify-content-between gap-3 mb-3">
-                        <div class="flex-grow-1">
-                            <label for="SPHearing" class="form-label">SP Hearing (mins)</label>
-                            <input type="number" id="SPHearing" class="form-control" v-model="form.soul.hearing.SP" />
-                        </div>
-                        <div class="flex-grow-1">
-                            <label for="GMHearing" class="form-label">GM Hearing (mins)</label>
-                            <input type="number" id="GMHearing" class="form-control" v-model="form.soul.hearing.GM" />
-                        </div>
-                        <div class="flex-grow-1">
-                            <label for="HGRSPHearing" class="form-label">HGRSP Hearing (mins)</label>
-                            <input type="number" id="HGRSPHearing" class="form-control"
-                                v-model="form.soul.hearing.HGRSP" />
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="hearingOther" class="form-label">Other Hearing</label>
-                        <textarea id="hearingOther" class="form-control" rows="3"
-                            v-model="form.soul.hearing.other"></textarea>
-                    </div>
-                    <div class="d-flex justify-content-between gap-3 mb-3">
-                        <div class="flex-grow-1">
-                            <label for="SPReading" class="form-label">SP Reading (mins)</label>
-                            <input type="number" id="SPReading" class="form-control" v-model="form.soul.reading.SPB" />
-                        </div>
-                        <div class="flex-grow-1">
-                            <label for="AboutSPReading" class="form-label">About SP Reading (mins)</label>
-                            <input type="number" id="AboutSPReading" class="form-control"
-                                v-model="form.soul.reading.aboutSP" />
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="readingOther" class="form-label">Other Reading</label>
-                        <textarea id="readingOther" class="form-control" rows="3"
-                            v-model="form.soul.reading.other"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label for="shloka" class="form-label">Shloka (number)</label>
-                        <input type="number" id="shloka" class="form-control" v-model="form.soul.shloka" />
+                    <div class="flex-grow-1">
+                        <label for="dayRest" class="form-label">Day Rest</label>
+                        <input type="number" id="dayRest" class="form-control" v-model="dailyForm.body.dayRest"
+                            :class="{'is-invalid': errors.body.dayRest}" min="0" required />
+                        <div v-if="errors.body.dayRest" class="text-danger">{{ errors.body.dayRest }}</div>
                     </div>
 
-                    <!-- Study Section -->
-                    <h5>Study</h5>
-                    <div class="mb-3">
-                        <label for="selfStudy" class="form-label">Self Study (mins)</label>
-                        <input type="number" id="selfStudy" class="form-control" v-model="form.study.selfStudy" />
+                    <div class="flex-grow-1">
+                        <label for="bedTime" class="form-label">Bed Time</label>
+                        <input type="time" id="bedTime" class="form-control" v-model="dailyForm.body.bedTime"
+                            :class="{'is-invalid': errors.body.bedTime}" required />
+                        <div v-if="errors.body.bedTime" class="text-danger">{{ errors.body.bedTime }}</div>
                     </div>
-                    <div class="mb-3">
-                        <label for="college" class="form-label">College Classes</label>
-                        <select id="college" class="form-select" v-model="form.study.college">
-                            <option disabled value="">Select...</option>
-                            <option>Attended All</option>
-                            <option>Missed 1</option>
-                            <option>Missed 2</option>
-                        </select>
-                    </div>
-
-                    <!-- Submit Button -->
-                    <button class="btn btn-success w-100" @click="handleSubmit">Submit</button>
                 </div>
+
+                <!-- Soul Section -->
+                <h5>Soul</h5>
+                <div class="form-check mb-2" v-for="(checked, key) in dailyForm.soul.mp" :key="key">
+                    <input type="checkbox" class="form-check-input" :id="key" v-model="dailyForm.soul.mp[key]"
+                        style="transform: scale(1.5);" />
+                    <label :for="key" class="form-check-label">{{ key.toUpperCase() }}</label>
+                </div>
+
+
+                <div class="d-flex justify-content-between gap-3 mb-3">
+                    <div class="flex-grow-1">
+                        <label for="SPHearing" class="form-label">SP Hearing</label>
+                        <input type="number" id="SPHearing" class="form-control" v-model="dailyForm.soul.hearing.SP"
+                            :class="{'is-invalid': errors.soul.hearing.SP}" min="0" />
+                        <div v-if="errors.soul.hearing.SP" class="invalid-feedback">{{errors.soul.hearing.SP}}</div>
+                    </div>
+
+                    <div class="flex-grow-1">
+                        <label for="GMHearing" class="form-label">GM Hearing</label>
+                        <input type="number" id="GMHearing" class="form-control" v-model="dailyForm.soul.hearing.GM"
+                            :class="{'is-invalid': errors.soul.hearing.GM}" min="0" />
+                        <div v-if="errors.soul.hearing.GM" class="invalid-feedback">{{errors.soul.hearing.GM}}</div>
+                    </div>
+
+                    <div class="flex-grow-1">
+                        <label for="HGRSPHearing" class="form-label">HGRSP Hearing</label>
+                        <input type="number" id="HGRSPHearing" class="form-control"
+                            v-model="dailyForm.soul.hearing.HGRSP" :class="{'is-invalid': errors.soul.hearing.HGRSP}"
+                            min="0" />
+                        <div v-if="errors.soul.hearing.HGRSP" class="invalid-feedback">{{errors.soul.hearing.HGRSP}}</div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="hearingOther" class="form-label">Other Hearing</label>
+                    <textarea id="hearingOther" class="form-control" rows="3"
+                        v-model="dailyForm.soul.hearing.other"></textarea>
+                </div>
+
+                <div class="d-flex justify-content-between gap-3 mb-3">
+                    <div class="flex-grow-1">
+                        <label for="SPReading" class="form-label">SP Reading</label>
+                        <input type="number" id="SPReading" class="form-control" v-model="dailyForm.soul.reading.SPB"
+                            :class="{'is-invalid': errors.soul.reading.SPB}" min="0" />
+                        <div v-if="errors.soul.reading.SPB" class="invalid-feedback">{{errors.soul.reading.SPB}}</div>
+                    </div>
+
+                    <div class="flex-grow-1">
+                        <label for="AboutSPReading" class="form-label">About SP</label>
+                        <input type="number" id="AboutSPReading" class="form-control"
+                            v-model="dailyForm.soul.reading.aboutSP" :class="{'is-invalid': errors.soul.reading.aboutSP}"
+                            min="0" />
+                        <div v-if="errors.soul.reading.aboutSP" class="invalid-feedback"> {{errors.soul.reading.aboutSP}} </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="readingOther" class="form-label">Other Reading</label>
+                    <textarea id="readingOther" class="form-control" rows="3"
+                        v-model="dailyForm.soul.reading.other"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label for="shloka" class="form-label">Shloka (number)</label>
+                    <input type="number" id="shloka" class="form-control" v-model="dailyForm.soul.shloka"
+                        :class="{'is-invalid': errors.soul.shloka}" min="0" />
+                    <div v-if="errors.soul.shloka" class="invalid-feedback">{{errors.soul.shloka}} </div>
+                </div>
+
+
+                <!-- Study Section -->
+                <h5>Study</h5>
+                <div class="mb-3">
+                    <label for="selfStudy" class="form-label">Self Study (mins)</label>
+                    <input type="number" id="selfStudy" class="form-control" v-model="dailyForm.study.selfStudy"
+                        :class="{'is-invalid': errors.study.selfStudy}" min="0" />
+                    <div v-if="errors.study.selfStudy" class="text-danger">{{ errors.study.selfStudy }}</div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="college" class="form-label">College Classes</label>
+                    <select id="college" class="form-select" v-model="dailyForm.study.college"
+                        :class="{'is-invalid': errors.study.college}" required>
+                        <option disabled value="">Select...</option>
+                        <option>Attended All</option>
+                        <option>Missed 1</option>
+                        <option>Missed 2</option>
+                    </select>
+                    <div v-if="errors.study.college" class="text-danger">{{ errors.study.college }}</div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" @click="validateForm" class="btn btn-success w-100">Submit</button>
             </form>
 
         </div>
@@ -239,18 +279,23 @@
                         { label: 'Sun', daygap: 6, status: 'future' }],
                     selectedDay: { label: null, daygap: null, status: null },
 
-                    form: {
+                    dailyForm: {
                         body: { wakeUp: '', dayRest: '', bedTime: '' },
                         soul: {
                             mp: {
                                 sa: false, mc: false, ma: false,
-                                japa: ''
                             },
+                            japa: '',
                             hearing: { SP: '', GM: '', HGRSP: '', other: '' },
                             reading: { SPB: '', aboutSP: '', other: '' },
                             shloka: ''
                         },
                         study: { selfStudy: '', college: '' },
+                    },
+                    errors: {
+                        body: { wakeUp: '', dayRest: '', bedTime: '' },
+                        soul: { japa: '', hearing: { SP: '', GM: '', HGRSP: '' }, reading: { SPB: '', aboutSP: '' }, shloka: '' },
+                        study: { selfStudy: '', college: '' }
                     }
                 };
             },
@@ -273,10 +318,84 @@
                 selectDay(day) {
                     this.selectedDay = day
                 },
+                validateForm() {
+                    let valid = true;
+                    console.log("caled validate form")
+
+                    // Body Validation
+                    if (!this.dailyForm.body.wakeUp) {
+                        this.errors.body.wakeUp = 'Wake up time is required.';
+                        valid = false;
+                    } else {
+                        this.errors.body.wakeUp = '';
+                    }
+
+                    if (this.dailyForm.body.dayRest < 0 || this.dailyForm.body.dayRest === '') {
+                        this.errors.body.dayRest = 'Day rest must be a positive number.';
+                        valid = false;
+                    } else {
+                        this.errors.body.dayRest = '';
+                    }
+
+                    if (!this.dailyForm.body.bedTime) {
+                        this.errors.body.bedTime = 'Bed time is required.';
+                        valid = false;
+                    } else {
+                        this.errors.body.bedTime = '';
+                    }
+
+                    // Soul Validation
+                    if (!this.dailyForm.soul.japa) {
+                        this.errors.soul.japa = 'Japa is required.';
+                        valid = false;
+                    } else {
+                        this.errors.soul.japa = '';
+                    }
+                    // hearing validations
+                    Object.entries(hearing).forEach(([key, value]) => {
+                        // ignore for other
+                        if (value != 'other') {
+
+                        } else {
+                            // ignore
+                            let inputvalue = this.dailyForm.soul[key]
+                            if (inputvalue < 0 || inputvalue === '') {
+                                this.errors.soul[key] = 'Day rest must be a positive number.';
+                                valid = false;
+                            } else {
+                                this.errors.soul[key] = '';
+                            }
+                        }
+                    });
+
+                    // Study Validation
+                    if (this.dailyForm.study.selfStudy < 0) {
+                        this.errors.study.selfStudy = 'Self-study must be a positive number.';
+                        valid = false;
+                    } else {
+                        this.errors.study.selfStudy = '';
+                    }
+
+                    if (!this.dailyForm.study.college) {
+                        this.errors.study.college = 'College attendance is required.';
+                        valid = false;
+                    } else {
+                        this.errors.study.college = '';
+                    }
+
+                    return valid;
+                },
 
                 handleSubmit() {
-                    alert('Form submitted successfully!');
-                    this.resetForm();
+                    if (this.validateForm()) {
+                        alert('Form submitted successfully!');
+                        // Clear errors on successful submission
+                        this.errors = {
+                            body: { wakeUp: '', dayRest: '', bedTime: '' },
+                            soul: { japa: '', hearing: { SP: '', GM: '', HGRSP: '' }, reading: '', shloka: '' },
+                            study: { selfStudy: '', college: '' }
+                        };
+                    }
                 },
                 resetForm() {
                     this.form = {

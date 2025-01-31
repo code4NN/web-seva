@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credit Risk Model Summary Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        .sidebar {
+            width: 250px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            border-right: 1px solid #ddd;
+        }
+
+        .sidebar .list-group-item {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .sidebar .list-group-item:hover {
+            background-color: #e9ecef;
+        }
+
+        .sidebar .list-group-item.active {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .top-tabs {
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .top-tabs .nav-link {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .top-tabs .nav-link:hover {
+            background-color: #e9ecef;
+        }
+
+        .top-tabs .nav-link.active {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .report-display {
+            white-space: pre-wrap;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        .upload-area {
+            text-align: center;
+            margin: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app" class="d-flex flex-column">
+        <!-- Upload Section -->
+        <div class="upload-area" v-if="!reports.length">
+            <h5>Upload a report to begin</h5>
+            <input type="file" @change="handleFileUpload" accept="application/json" class="form-control w-50 mx-auto">
+        </div>
+
+        <!-- Dashboard Section -->
+        <div v-else class="d-flex">
+            <!-- Sidebar -->
+            <div v-show="showSidebar" class="sidebar">
+                <button class="btn btn-link w-100 text-start" @click="toggleSidebar">Hide Sidebar</button>
+                <ul class="list-group">
+                    <li v-for="(report, index) in reports" :key="index" class="list-group-item"
+                        :class="{ active: activeReportIndex === index }" @click="activateReport(index)">
+                        {{ report.meta.display_name }}
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Main Content -->
+            <div class="flex-grow-1">
+                <button v-if="!showSidebar" class="btn btn-link" @click="toggleSidebar">Show Sidebar</button>
+
+                <div v-if="activeReport">
+                    <!-- Horizontal Tabs -->
+                    <ul class="nav nav-tabs top-tabs">
+                        <li class="nav-item" v-for="(subReport, subIndex) in activeReport.data" :key="subIndex">
+                            <a class="nav-link" :class="{ active: activeSubReportIndex === subIndex }"
+                                @click="activateSubReport(subIndex)">
+                                {{ subReport.meta.display_name }}
+                            </a>
+                        </li>
+                    </ul>
+
+                    <!-- Report Display Area  -->
+                    <div class="p-4">
+                        <h5 v-if="activeSubReport">Displaying: {{ activeSubReport.meta.display_name }}</h5>
+
+                        <div v-if="activeSubReport?.data?.raw">
+                            <div v-if="activeReportIndex==0" class="report-display">
+                                {{activeSubReport.data.raw}}
+                            </div>
+                            <div v-else-if="activeReportIndex==1" class="report-display">
+
+                                <div v-if="activeSubReport?.data?.raw">
+                                    <div v-for="(tableData, tableTitle) in activeSubReport.data.raw" :key="tableTitle"
+                                        class="mb-4">
+                                        <h5 class="text-center">{{ tableTitle.toUpperCase() }}</h5>
+                                        <table class="table table-bordered">
+                                            <thead>
+                                                <tr>
+                                                    <th v-for="(header, index) in Object.keys(tableData)" :key="index">
+                                                        {{ header }}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td v-for="(row, rowIndex) in Object.values(tableData)"
+                                                        :key="rowIndex">
+                                                        {{row}}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <p v-else>Please select a report to view.</p>
+
+                            </div>
+                            <div v-else-if="activeReportIndex == 2 || activeReportIndex == 3" class="report-display">
+
+                                <div v-for="(tableData_wrapper, tableTitle) in activeSubReport.data.raw"
+                                    :key="tableTitle" class="mb-4">
+                                    <h5 class="text-center">{{ tableTitle.toUpperCase() }}</h5>
+
+
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th v-for="(header, index) in Object.keys(tableData_wrapper.kstable['0'])"
+                                                    :key="index">
+                                                    {{ header }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="(row,rowindex) in Object.values(tableData_wrapper.kstable)">
+                                                <td v-for="(cell, cellindex) in Object.values(row)"
+                                                    :key="rowindexcellindex">
+                                                    {{cell}}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+
+                                </div>
+                            </div>
+
+                            <div v-else-if="activeReportIndex==4" class="report-display">
+
+                                    <h5 class="text-center">Model features </h5>
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th v-for="(header, index) in Object.keys(activeSubReport.data.raw[0])" :key="index">
+                                                    {{ header }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="(row,rowindex) in Object.values(activeSubReport.data.raw)">
+                                                <td v-for="(cell, cellindex) in Object.values(row)" :key="rowindexcellindex">
+                                                    {{cell}}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    </div>
+                                <p v-else>Please select a report to view.</p>
+
+
+                            </div>
+                        </div>
+                        <div v-else>
+                            <p>Please select a report from the sidebar to begin.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                const app = Vue.createApp({
+                    data() {
+                        return {
+                            showSidebar: true,
+                            activeReportIndex: null,
+                            activeSubReportIndex: null,
+                            reports: []
+                        };
+                    },
+                    computed: {
+                        activeReport() {
+                            return this.reports[this.activeReportIndex] || null;
+                        },
+                        activeSubReport() {
+                            return this.activeReport?.data[this.activeSubReportIndex] || null;
+                        }
+                    },
+                    methods: {
+                        toggleSidebar() {
+                            this.showSidebar = !this.showSidebar;
+                        },
+                        activateReport(index) {
+                            this.activeReportIndex = index;
+                            this.activeSubReportIndex = null; // Reset sub-report
+                        },
+                        activateSubReport(index) {
+                            this.activeSubReportIndex = index;
+                        },
+                        handleFileUpload(event) {
+                            const file = event.target.files[0];
+                            if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (e) => {
+                                    try {
+                                        this.reports = JSON.parse(e.target.result);
+                                        this.activeReportIndex = null;
+                                        this.activeSubReportIndex = null;
+                                    } catch (error) {
+                                        alert("Invalid JSON format.");
+                                    }
+                                };
+                                reader.readAsText(file);
+                            }
+                        },
+                        getTableHeaders(tableData) {
+                            // Extract keys from the first row of the table data for headers.
+                            return tableData.length > 0 ? Object.keys(tableData[0]) : [];
+                        }
+                    }
+                });
+
+                app.mount('#app');
+            </script>
+</body>
+
+</html>

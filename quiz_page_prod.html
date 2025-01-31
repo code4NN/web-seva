@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz Page</title>
+  <script src="https://unpkg.com/vue@3"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script> -->
+
+  <!-- Global Styles -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+
+    .app-container {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .scrollable-container {
+      display: flex;
+      gap: 20px;
+      overflow-x: auto;
+    }
+
+    button {
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      padding: 10px 20px;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .date-item {
+      padding: 10px 20px;
+      background-color: #f1f1f1;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background-color 0.3s;
+    }
+
+    .date-item.selected {
+      background-color: #007bff;
+      color: white;
+    }
+
+    .date-item:hover {
+      background-color: #e0e0e0;
+      cursor: pointer;
+    }
+
+    .nav-button {
+      margin: 5px;
+      padding: 10px;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      background-color: #28a745;
+      color: white;
+    }
+
+    .nav-button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .nav-bar {
+      margin: 20px 0;
+      display: flex;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
+    .nav-bar button {
+      background-color: #17a2b8;
+    }
+
+    .nav-bar button.active {
+      background-color: #007bff;
+    }
+
+    .leaderboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    .leaderboard-table th,
+    .leaderboard-table td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+    }
+
+    .leaderboard-table th {
+      background-color: #007bff;
+      color: white;
+    }
+
+    /* for Attempt quiz section */
+    .bg-success {
+      background-color: #beeec9 !important;
+      /* Light green background */
+    }
+
+    .spinner-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      /* Dim everything behind */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 9999;
+      /* Ensure the spinner is on top */
+    }
+  </style>
+
+</head>
+
+<body>
+  <div id="app" class="app-container"></div>
+
+  <script>
+    const { ref, reactive, onMounted, computed } = Vue;
+
+    // Spinner
+    const Spinner = {
+      props: {
+        isLoading: {
+          type: Boolean,
+          required: true
+        },
+        message: {
+          type: String,
+          default: 'Loading, please wait...' // Default message
+        }
+      },
+      template: `
+        <div v-if="isLoading" class="spinner-overlay">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <div class="mt-3 text-center text-primary">
+            <p>{{ message }}</p>
+          </div>
+        </div>
+      `,
+      style: `
+         .spinner-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.5); /* Dim everything behind */
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          flex-direction: column;
+          z-index: 9999; /* Ensure the spinner is on top */
+        }
+      `
+    };
+
+
+    // DateSelector Component
+    const DateSelector = {
+      props: ['dates'],
+      emits: ['dateSelected'],
+      setup(props, { emit }) {
+        const selectedDate = ref(null);
+
+        const selectDate = (date) => {
+          selectedDate.value = date;
+          emit('dateSelected', date);
+        };
+
+        return { selectedDate, selectDate };
+      },
+      template: `
+        <div>
+          <label for="date-selector">Select a Date:</label>
+          <div id="date-selector-container" class="scrollable-container">
+            <div
+              v-for="(date, index) in dates"
+              :key="index"
+              :class="['date-item', { selected: date === selectedDate }]"
+              @click="selectDate(date)"
+            >
+              {{ date.split("|")[2] }}
+            </div>
+          </div>
+        </div>
+      `
+    };
+
+    // AttemptQuiz Component
+    const AttemptQuiz = {
+      props: {
+        questions: {
+          type: Object,
+          required: true
+        },
+        about_question: {
+          type: Object,
+          required: true
+        },
+        quizActive: {
+          type: Boolean,
+          required: true
+        }
+      },
+      emits: ['submitQuiz', 'quizactivetoggle'],
+      setup(props, { emit }) {
+        const userResponses = reactive({});
+        const elapsedSeconds = ref(0);
+        const intervalId = ref(null);
+        const questionStyles = reactive({});
+
+        // Initialize userResponses and questionStyles
+        Object.entries(props.questions).forEach(([key, question]) => {
+          if (question.type === 'MCQ' || question.type === 'SCQ') {
+            userResponses[key] = {
+              answer: [],
+              mark: -1
+            };
+          } else if (question.type === 'FIB' || question.type === 'OLA') {
+            userResponses[key] = {
+              answer: '',
+              mark: -1
+            };
+          }
+          questionStyles[key] = "bg-light";
+        });
+
+
+
+        // Timer
+        const elapsedTime = computed(() => {
+          const minutes = Math.floor(elapsedSeconds.value / 60)
+            .toString()
+            .padStart(2, "0");
+          const seconds = (elapsedSeconds.value % 60).toString().padStart(2, "0");
+          return `${minutes}:${seconds}`;
+        });
+
+        const startQuiz = () => {
+          emit('quizactivetoggle', !props.quizActive);
+          if (props.quizActive) {
+            stopTimer();
+            Object.entries(props.questions).forEach(([key, question]) => {
+              if (question.type === 'MCQ' || question.type === 'SCQ') {
+                userResponses[key] = {
+                  answer: [],
+                  mark: -1
+                };
+              } else if (question.type === 'FIB' || question.type === 'OLA') {
+                userResponses[key] = {
+                  answer: '',
+                  mark: -1
+                };
+              }
+              questionStyles[key] = "bg-light";
+            })
+          }
+          else {
+            intervalId.value = setInterval(() => {
+              elapsedSeconds.value++;
+            }, 1000);
+          }
+        };
+
+        const stopTimer = () => {
+          clearInterval(intervalId.value);
+          intervalId.value = null;
+          elapsedSeconds.value = 0;
+        };
+
+        // Handle SCQ Selection
+        const handleSCQSelection = (questionKey, optionIndex) => {
+          userResponses[questionKey].answer = [optionIndex];
+          questionStyles[questionKey] = "bg-success";
+        };
+
+        // Handle MCQ Toggle
+        const handleMCQToggle = (questionKey, optionIndex) => {
+          const idx = userResponses[questionKey].answer.indexOf(optionIndex);
+          if (idx === -1) {
+            userResponses[questionKey].answer.push(optionIndex);
+          } else {
+            userResponses[questionKey].answer.splice(idx, 1);
+          }
+
+          questionStyles[questionKey] =
+            userResponses[questionKey].answer.length > 0 ? "bg-success" : "bg-danger";
+        };
+
+        // Check if all questions are answered
+        const allQuestionsAnswered = computed(() =>
+          Object.keys(props.questions).every((key) => {
+            const response = userResponses[key].answer;
+            return props.questions[key].type === "SCQ" ||
+              props.questions[key].type === "MCQ"
+              ? response.length > 0
+              : response.trim().length > 0;
+          })
+        );
+
+        // Submit Quiz
+        const submitQuiz = () => {
+          if (!allQuestionsAnswered.value) {
+            alert("Please answer all questions before submitting.");
+            return;
+          }
+          const time_taken_for_quiz = elapsedSeconds.value;
+          emit('quizactivetoggle', !props.quizActive);
+
+          stopTimer();
+
+          const finalResponses = {};
+
+          for (const key in props.questions) {
+            const question = props.questions[key];
+            const userResponse = userResponses[key];
+
+            if (question.type === "SCQ") {
+              // For SCQ: If selected answer is correct, assign 1 mark, else 0
+              finalResponses[key] = {
+                answer: userResponse.answer,
+                mark: question.options[userResponse.answer[0]].is_correct ? 1 : 0,
+                pending_checking: false
+              };
+            } else if (question.type === "MCQ") {
+              // For MCQ: Find the total number of correct answers
+              const correctAnswers = question.options.filter(opt => opt.is_correct).length;
+
+              // Calculate the marks for selected answers
+              let totalMarks = 0;
+              userResponse.answer.forEach(optionIndex => {
+                const option = question.options[optionIndex];
+                if (option.is_correct) {
+                  totalMarks += 1 / correctAnswers;  // Positive mark for correct answers
+                } else {
+                  totalMarks -= 1 / (correctAnswers); // Negative mark for incorrect answers
+                }
+              });
+
+              finalResponses[key] = {
+                answer: userResponse.answer,
+                mark: parseFloat(totalMarks.toFixed(2)),
+                pending_checking: false
+              };
+            } else {
+              // For FIB and OLA: Keep marks 0
+              finalResponses[key] = {
+                answer: userResponse.answer,
+                mark: 0,
+                pending_checking: true
+              };
+            }
+          }
+
+          emit("submitQuiz", { responses: finalResponses,
+          timeTaken: time_taken_for_quiz,
+          status: "submitted"
+           });
+          alert("Quiz submitted successfully!");
+        };
+
+
+
+        return {
+          elapsedTime,
+          userResponses,
+          questionStyles,
+          startQuiz,
+          handleSCQSelection,
+          handleMCQToggle,
+          allQuestionsAnswered,
+          submitQuiz
+        };
+      },
+      template: `
+    <div class="mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Attempt Quiz</h2>
+        <p>This was uploaded at {{about_question.upload_time}} </p>
+        <button @click="startQuiz" class="btn btn-primary">
+            {{ quizActive ? 'Deactivate' : 'Activate' }}
+        </button>
+    </div>
+    <div v-if="quizActive">
+        <span class="badge bg-info fs-5">Time Elapsed: {{ elapsedTime }}</span>
+        <div v-for="(question, key) in questions" :key="key" class="card mb-3" :class="questionStyles[key]">
+            <div class="card-body">
+                <h5 class="card-title">{{ question.question }}</h5>
+                <!-- SCQ -->
+                <div v-if="question.type === 'SCQ'">
+                    <div v-for="(option, index) in question.options" :key="index" class="form-check">
+                        <input type="radio" class="form-check-input" :name="key" :id="key + '-' + index"
+                            @change="handleSCQSelection(key, index)"
+                            :checked="userResponses[key].answer.includes(index)" />
+                        <label class="form-check-label" :for="key + '-' + index">
+                            {{ option.value }}
+                        </label>
+                    </div>
+                </div>
+                <!-- MCQ -->
+                <div v-if="question.type === 'MCQ'">
+                    <div v-for="(option, index) in question.options" :key="index" class="form-check">
+                        <input type="checkbox" class="form-check-input" :id="key + '-' + index"
+                            @change="handleMCQToggle(key, index)"
+                            :checked="userResponses[key].answer.includes(index)" />
+                        <label class="form-check-label" :for="key + '-' + index">
+                            {{ option.value }}
+                        </label>
+                    </div>
+                </div>
+                <!-- FIB -->
+                <div v-if="question.type === 'FIB'">
+                    <input type="text" class="form-control" v-model="userResponses[key].answer"
+                        placeholder="Enter your answer" />
+                </div>
+                <!-- OLA -->
+                <div v-if="question.type === 'OLA'">
+                    <textarea class="form-control" rows="3" v-model="userResponses[key].answer"
+                        placeholder="Enter your answer"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-success w-100" :disabled="!allQuestionsAnswered" @click="submitQuiz">
+            Submit Quiz
+        </button>
+    </div>
+</div>
+  `
+    };
+
+    // PreviewQuiz Component
+    const PreviewQuiz = {
+      props: ['questions', 'userAnswers'],
+      template: `
+        <div>
+          <h2>Preview Quiz</h2>
+          <div v-for="(question, index) in questions" :key="index">
+            <p>{{ question.text }}</p>
+            <p>Your Answer: {{ userAnswers[index] }}</p>
+          </div>
+        </div>
+      `
+    };
+
+    // Leaderboard Component
+    const Leaderboard = {
+      props: ['leaderboardData'],
+      template: `
+        <div>
+          <h2>Leaderboard</h2>
+          <table class="leaderboard-table">
+            <tr>
+              <th>User</th>
+              <th>Score</th>
+              <th>Time Taken</th>
+            </tr>
+            <tr v-for="user in leaderboardData" :key="user.id">
+              <td>{{ user.name }}</td>
+              <td>{{ user.score }}</td>
+              <td>{{ user.timeTaken }}</td>
+            </tr>
+          </table>
+        </div>
+      `
+    };
+
+    // Main App
+    const app = Vue.createApp({
+      components: {
+        Spinner,
+        DateSelector,
+        AttemptQuiz,
+        PreviewQuiz,
+        Leaderboard,
+      },
+      setup() {
+
+        const KYClient = ref({
+          status: "not_verified",
+          creds: {}
+        });
+
+        const date_list = ref([]);
+        const selectedDate = ref(null);
+
+        const activeMode = ref('attempt');
+        const isQuizActive = ref(false);
+
+        const spinnerStatus = ref({
+          is_loading: false,
+          msg: ""
+        });
+
+        const userAnswers = ref({});
+        const leaderboardData = ref([]);
+        const isChecker = ref(false);
+
+        const qnadatabase = ref({});
+
+        const question_for_date_selected = computed(() => {
+          if (selectedDate.value) {
+            return {
+              questions: qnadatabase.value[selectedDate.value].qna,
+              metadata: {
+                upload_time: qnadatabase.value[selectedDate.value].upload_time,
+                edit_row: qnadatabase.value[selectedDate.value].edit_row,
+              }
+            }
+          }
+          else {
+            return {}
+          }
+        });
+
+        const handleDateChange = (date) => {
+          selectedDate.value = date;
+          // await fetchqna_data(date);
+        };
+
+        const submitQuiz = (payload) => {
+          spinnerStatus.value = { is_loading: true, msg: "Submitting Quiz" };
+
+          console.log(payload)
+          console.log(JSON.stringify(payload))
+          console.log(question_for_date_selected.value.metadata.edit_row)
+          console.log(KYClient.value.creds.db_col.value)
+
+          const upload_material = {
+            ...payload,
+            upload_time: 'to_be_filled_by_server'
+          }
+          const upload_row = question_for_date_selected.value.metadata.edit_row;
+          const upload_column = KYClient.value.creds.db_col.value;
+
+          google.script.run.withSuccessHandler((response) => {
+            if (response.status === 'success') {
+              // Successfully submitted
+              newQuestions.value = {}
+            } else if (response.status == "failed") {
+              // some error
+              // console.log("Failed submission")
+            }
+          }).withFailureHandler(() => {
+            // console.log('An unknown error occurred during uploading.');
+          }).qna_upload_to_cell(JSON.stringify(upload_material), upload_row, upload_column);
+
+          alert('Quiz submitted!');
+          spinnerStatus.value = { is_loading: false, msg: "" };
+
+        };
+
+
+        const submitMarks = async (marks) => {
+          alert('Marks submitted!');
+        };
+
+        const fetchDataFromServer = () => {
+
+          // // to run locally use this snippet
+          // localdatabase = JSON.parse(
+          //   `{"new_date_row":"5","date_list":["1737763200|2025-01-25|Jan 25, Sat","1737849600|2025-01-26|Jan 26, Sun","1738022400|2025-01-28|Jan 28, Tue"],"fulldb":{"1737763200|2025-01-25|Jan 25, Sat":{"answer_by_user":{"shiven":{"status":"pending"}},"upload_time":"2025-01-27T10:52:23","creator":{"db_col":{"addr":"E3","value":6},"password":{"addr":"C3","value":"108"},"display_name":{"addr":"D3","value":"Shivendra Pr"},"username":{"addr":"B3","value":"shiven"}},"qna":{"Q1":{"question":"is science against spirituality?","options":[{"value":"No science is not against","is_correct":true},{"value":"yes. for some atheist scientiest","is_correct":false}],"type":"MCQ"}},"edit_row":2},"1737849600|2025-01-26|Jan 26, Sun":{"answer_by_user":{"shiven":{"status":"pending"}},"upload_time":"2025-01-27T15:53:34","creator":{"db_col":{"addr":"E3","value":6},"password":{"addr":"C3","value":"108"},"display_name":{"addr":"D3","value":"Shivendra Pr"},"username":{"addr":"B3","value":"shiven"}},"qna":{"Q1":{"question":"Who is supreme?","options":[{"value":"Brahma","is_correct":false},{"value":"Vishnu","is_correct":true},{"value":"Mahesh","is_correct":false},{"value":"everyone is God","is_correct":false}],"type":"SCQ"},"Q2":{"question":"Everyone is looking for BLANK some know and some don't","options":[{"value":"Krishna","is_correct":true},{"value":"Govinda","is_correct":true}],"type":"FIB"}},"edit_row":3},"1738022400|2025-01-28|Jan 28, Tue":{"upload_time":"2025-01-28T09:52:28","answer_by_user":{"shiven":{"status":"pending"}},"creator":{"db_col":{"addr":"E3","value":6},"password":{"addr":"C3","value":"108"},"display_name":{"addr":"D3","value":"Shivendra Pr"},"username":{"addr":"B3","value":"shiven"}},"qna":{"Q1":{"question":"Who is God?","options":[{"value":"Krishna","is_correct":true},{"value":"Indra","is_correct":false},{"value":"Varuna","is_correct":false},{"value":"Everyone","is_correct":false}],"type":"SCQ"},"Q2":{"question":"What are real problems","options":[{"value":"exams","is_correct":false},{"value":"birth","is_correct":true},{"value":"old age","is_correct":true},{"value":"disease","is_correct":true}],"type":"MCQ"},"Q3":{"question":"right way to gain knowledge is by BLANK","options":[{"value":"approaching a guru","is_correct":true}],"type":"FIB"},"Q4":{"question":"What is essence of all knowledge","options":[{"value":"To know Krishna","is_correct":true}],"type":"OLA"}},"edit_row":4}},"status":"success"}`
+          // )
+          // date_list.value = localdatabase.date_list;
+          // qnadatabase.value = localdatabase.fulldb;
+
+
+          // to run on server do this
+
+          // Call the Google Apps Script API to fetch data
+          google.script.run.withSuccessHandler((response) => {
+            // Handle success response
+            if (response.status === "success") {
+              // got the data correctly
+              // status: "success",
+              // date_list: date_list,
+              // new_date_row: (active_db_last_row + 1).toFixed(0),
+              // userdb: user_data_date_wise
+              date_list.value = response.date_list;
+              qnadatabase.value = response.fulldb;
+            }
+          }
+          ).withFailureHandler((error) => {
+            // Handle error
+            // console.log("Error fetching data: ", error);
+          }).qna_get_qnadb();
+          // // console.log("fetched completed")
+        };
+        onMounted(() => {
+
+          if (localStorage.getItem('creds') !== null) {
+            KYClient.value = {
+              status: "verified",
+              creds: JSON.parse(localStorage.getItem('creds'))
+            };
+
+            fetchDataFromServer();
+
+          }
+          else {
+            // simulated logged in user
+            // uncomment only to test the script
+            fetchDataFromServer();
+            KYClient.value = {
+              status: "verified",
+              // // credential for Shivendra
+              // creds: JSON.parse(`{"db_col":{"addr":"E3","value":6},"password":{"addr":"C3","value":"108"},"display_name":{"addr":"D3","value":"Shivendra Pr"},"username":{"addr":"B3","value":"shiven"}}`)
+              
+              // credential for Parth Pr
+              // parth	198	Parth Pr	7	user
+              creds: JSON.parse(`{"db_col":{"addr":"E4","value":7},"password":{"addr":"C4","value":"198"},"display_name":{"addr":"D4","value":"Parth Pr"},"username":{"addr":"B4","value":"parth"}}`)
+            };
+            // fetchDataFromServer();
+          }
+        });
+
+        return {
+          KYClient,
+          date_list,
+          selectedDate,
+          activeMode,
+          question_for_date_selected,
+          isQuizActive,
+          spinnerStatus,
+
+          userAnswers,
+          leaderboardData,
+          isChecker,
+
+          handleDateChange,
+          submitQuiz,
+          submitMarks,
+        };
+      },
+      template: `
+       <div>
+        <Spinner :isLoading="spinnerStatus.is_loading" :message="spinnerStatus.msg"></spinner>
+
+    <div v-if="KYClient.status !== 'verified'" class="d-flex justify-content-center align-items-center vh-100 bg-light">
+        <div class="text-center p-4 border rounded shadow bg-white">
+            <h5 class="mb-3">You are not logged in</h5>
+            <p>Please login first to continue.</p>
+        </div>
+    </div>
+    <div v-else>
+
+        <div v-if="!isQuizActive">
+            <DateSelector :dates="date_list" @dateSelected="handleDateChange" />
+            <div class="nav-bar">
+                <button :class="{ active: activeMode === 'attempt' }" @click="activeMode = 'attempt'"
+                    :disabled="activeMode === 'attempt'">Attempt Quiz</button>
+                <button :class="{ active: activeMode === 'preview' }" @click="activeMode = 'preview'"
+                    :disabled="activeMode !== 'attempt'">Preview Quiz</button>
+                <button :class="{ active: activeMode === 'leaderboard' }" @click="activeMode = 'leaderboard'"
+                    :disabled="activeMode !== 'preview'">Leaderboard</button>
+                <button v-if="isChecker" @click="activeMode = 'check'" :disabled="activeMode !== 'preview'">Check
+                    Quiz</button>
+            </div>
+        </div>
+        <AttemptQuiz v-if="activeMode === 'attempt' && selectedDate" 
+            :questions="question_for_date_selected.questions"
+            :quizActive="isQuizActive" 
+            :about_question="question_for_date_selected.metadata"
+            @submitQuiz="submitQuiz"
+            @quizactivetoggle="isQuizActive = $event" 
+            />
+
+        <PreviewQuiz v-if="activeMode === 'preview'" :questions="questions" :userAnswers="userAnswers" />
+        <Leaderboard v-if="activeMode === 'leaderboard'" :leaderboardData="leaderboardData" />
+    </div>
+</div>
+      `
+    });
+
+    app.mount('#app');
+  </script>
+
+</body>
+
+</html>

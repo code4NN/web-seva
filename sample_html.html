@@ -1,0 +1,29 @@
+<div class="container my-4">
+    <!-- Question Title -->
+    <div class="mb-4">
+        <label for="questionTitle" class="form-label fw-bold">Question Title</label>
+        <textarea id="questionTitle" v-model="questionTitle" class="form-control" rows="3"
+            placeholder="Enter your question here..."></textarea>
+    </div>
+
+    <!-- Option List -->
+    <div v-for="(option, index) in optionList" :key="index" class="mb-3 d-flex align-items-center gap-3">
+        <!-- Option Text -->
+        <input v-model="option.text" type="text" class="form-control" placeholder="Enter option text">
+
+        <!-- Mark as Correct Button -->
+        <button class="btn btn-outline-success" @click="toggle_is_correct(index)">
+            {{ option.isCorrect ? 'Correct' : 'Mark Correct' }}
+        </button>
+
+        <!-- Remove Option Button -->
+        <button class="btn btn-outline-danger" @click="remove_option(index)">
+            Remove
+        </button>
+    </div>
+
+    <!-- Add New Option Button -->
+    <button class="btn btn-outline-primary" @click="add_option">
+        Add Option
+    </button>
+</div>

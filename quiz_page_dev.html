@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz Page</title>
+  <script src="https://unpkg.com/vue@3"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script> -->
+
+  <!-- Global Styles -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+
+    .app-container {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .user-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+      z-index: 1000;
+    }
+
+    .user-details {
+      position: absolute;
+      top: 50px;
+      right: 10px;
+      background: white;
+      cursor: pointer;
+      border-radius: 5px;
+      min-width: 180px;
+      z-index: 999;
+    }
+
+    .scrollable-container {
+      display: flex;
+      gap: 20px;
+      overflow-x: auto;
+    }
+
+    button {
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      padding: 10px 20px;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .date-item {
+      padding: 10px 20px;
+      background-color: #f1f1f1;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background-color 0.3s;
+    }
+
+    .date-item.selected {
+      background-color: #007bff;
+      color: white;
+    }
+
+    .date-item:hover {
+      background-color: #e0e0e0;
+      cursor: pointer;
+    }
+
+    .nav-button {
+      margin: 5px;
+      padding: 10px;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      background-color: #28a745;
+      color: white;
+    }
+
+    .nav-button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    .nav-bar {
+      margin: 20px 0;
+      display: flex;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
+    .nav-bar button {
+      background-color: #17a2b8;
+    }
+
+    .nav-bar button.active {
+      background-color: #007bff;
+    }
+
+    .leaderboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    .leaderboard-table th,
+    .leaderboard-table td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+    }
+
+    .leaderboard-table th {
+      background-color: #007bff;
+      color: white;
+    }
+
+    /* for Attempt quiz section */
+    .bg-success {
+      background-color: #beeec9 !important;
+      /* Light green background */
+    }
+
+    .spinner-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      /* Dim everything behind */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 9999;
+      /* Ensure the spinner is on top */
+    }
+  </style>
+
+</head>
+
+<body>
+  <div id="app" class="app-container"></div>
+
+  <script>
+    const { ref, reactive, onMounted, computed, onUnmounted } = Vue;
+
+    // Spinner
+    const Spinner = {
+      props: {
+        isLoading: {
+          type: Boolean,
+          required: true
+        },
+        message: {
+          type: String,
+          default: 'Loading, please wait...' // Default message
+        }
+      },
+      template: `
+        <div v-if="isLoading" class="spinner-overlay">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <div class="mt-3 text-center text-primary">
+            <p>{{ message }}</p>
+          </div>
+        </div>
+      `
+    };
+
+    // userinfo
+    const UserInfo = {
+      props: {
+        user: {
+          type: Object,
+          required: true
+        }
+      },
+      setup(props) {
+        const showDetails = ref(false);
+
+        const displayName = computed(() =>
+          props.user.status === "verified" ? props.user.creds.display_name.value : "Guest"
+        );
+
+        const username = computed(() =>
+          props.user.status === "verified" ? props.user.creds.username.value : "N/A"
+        );
+
+        const group = computed(() =>
+          props.user.status === "verified" ? props.user.creds.group : "None"
+        );
+
+        const initialLetter = computed(() =>
+          props.user.status === "verified" ? props.user.creds.display_name.value.charAt(0).toUpperCase() : "G"
+        );
+
+        const bgColor = computed(() =>
+          props.user.status === "verified" ? "bg-success text-white" : "bg-danger text-white"
+        );
+
+        // Toggle details visibility
+        const toggleDetails = () => {
+          showDetails.value = !showDetails.value;
+        };
+
+        // Close details if clicked outside
+        const handleClickOutside = (event) => {
+          const userCircle = document.getElementById('user-circle');
+          const userDetails = document.getElementById('user-details');
+          if (
+            userCircle && !userCircle.contains(event.target) &&
+            userDetails && !userDetails.contains(event.target)
+          ) {
+            showDetails.value = false;
+          }
+        };
+
+        // Set up event listener for clicks outside the component
+        Vue.onMounted(() => {
+          document.addEventListener('click', handleClickOutside);
+        });
+
+        // Remove event listener on cleanup
+        Vue.onBeforeUnmount(() => {
+          document.removeEventListener('click', handleClickOutside);
+        });
+
+        return { showDetails, toggleDetails, displayName, username, group, initialLetter, bgColor };
+      },
+      template: `
+    <div class="position-relative">
+      <!-- Circle in Top Right -->
+      <div 
+        id="user-circle"
+        class="user-circle position-absolute top-0 end-0 d-flex align-items-center justify-content-center"
+        :class="bgColor"
+        @click="toggleDetails"
+        style="cursor: pointer;"
+      >
+        {{ initialLetter }}
+      </div>
+      
+      <!-- User Details (Shows on Click) -->
+      <div v-if="showDetails" id="user-details" class="user-details card p-3 shadow-sm">
+        <h5 class="mb-1">{{ displayName }}</h5>
+        <p class="mb-0"><strong>Username:</strong> {{ username }}</p>
+        <p class="mb-0"><strong>Group:</strong> {{ group }}</p>
+      </div>
+    </div>
+  `
+
+    };
+
+
+    // DateSelector Component
+    const DateSelector = {
+      props: {
+        dates: {
+          type: Array,
+          required: true
+        },
+        date_selected: {
+          type: String,
+          required: true
+        }
+      },
+      emits: ['dateSelected'],
+      setup(props, { emit }) {
+
+        return {};
+      },
+      template: `
+  <div>
+    <label for="date-selector"></label>
+    <div id="date-selector-container" class="scrollable-container">
+      <div v-for="(date, index) in dates" :key="index" :class="['date-item', { selected: date === date_selected }]"
+        @click="$emit('dateSelected', date)">
+        {{ date.split("|")[2] }}
+      </div>
+    </div>
+  </div>
+  `
+    };
+
+    // AttemptQuiz Component
+    const AttemptQuiz = {
+      props: {
+        questions: {
+          type: Object,
+          required: true
+        },
+        quizActive: {
+          type: Boolean,
+          required: true
+        },
+        about_question: {
+          type: Object,
+          required: true
+        },
+        submissions: {
+          type: Object,
+          required: true
+        }
+      },
+      emits: ['submitQuiz', 'quizactivetoggle'],
+      setup(props, { emit }) {
+        const userResponses = reactive({});
+        const elapsedSeconds = ref(0);
+        const elapsedSeconds_since_upload = ref(0);
+        const intervalId = ref(null);
+        const intervalId_since_upload = ref(null);
+        const questionStyles = reactive({});
+
+        // Initialize userResponses and questionStyles
+        Object.entries(props.questions).forEach(([key, question]) => {
+          if (question.type === 'MCQ' || question.type === 'SCQ') {
+            userResponses[key] = {
+              answer: [],
+              mark: -1
+            };
+          } else if (question.type === 'FIB' || question.type === 'OLA') {
+            userResponses[key] = {
+              answer: '',
+              mark: -1
+            };
+          }
+          questionStyles[key] = "bg-light";
+        });
+
+        const about_quiz_parsed = computed(() => {
+          const upload_time = new Date(props.about_question.upload_time);
+          const upload_time_formatted = upload_time.toLocaleString("en-US",
+            {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            });
+          // how many devotees have answered
+          const n_submitted = Object.values(props.submissions.allSubmission)
+            .filter(entry => entry.status === "submitted").length;
+
+          return {
+            upload_time_raw: upload_time,
+            upload_time: upload_time_formatted,
+            elapsed_time: elapsedTime_since_upload,
+            submitted_count: n_submitted,
+            creator: "to be filled"
+          }
+
+        });
+
+        // Timer
+        const elapsedTime = computed(() => {
+          const minutes = Math.floor(elapsedSeconds.value / 60)
+            .toString()
+            .padStart(2, "0");
+          const seconds = (elapsedSeconds.value % 60).toString().padStart(2, "0");
+          return `${minutes}:${seconds}`;
+        });
+        const elapsedTime_since_upload = computed(() => {
+          let seconds = elapsedSeconds_since_upload.value;
+          let hours = Math.floor(seconds / 3600);
+          let minutes = Math.floor((seconds % 3600) / 60);
+          let secs = seconds % 60;
+          return `${hours}h ${minutes}m ${secs}s`;
+        });
+
+        const toggle_startQuiz = () => {
+          emit('quizactivetoggle', !props.quizActive);
+
+          if (props.quizActive) {
+            stopTimer();
+            Object.entries(props.questions).forEach(([key, question]) => {
+              if (question.type === 'MCQ' || question.type === 'SCQ') {
+                userResponses[key] = {
+                  answer: [],
+                  mark: -1
+                };
+              } else if (question.type === 'FIB' || question.type === 'OLA') {
+                userResponses[key] = {
+                  answer: '',
+                  mark: -1
+                };
+              }
+              questionStyles[key] = "bg-light";
+            })
+          }
+          else {
+            intervalId.value = setInterval(() => {
+              elapsedSeconds.value++;
+            }, 1000);
+          }
+        };
+
+        const stopTimer = () => {
+          clearInterval(intervalId.value);
+          intervalId.value = null;
+          elapsedSeconds.value = 0;
+        };
+
+        // Handle SCQ Selection
+        const handleSCQSelection = (questionKey, optionIndex) => {
+          userResponses[questionKey].answer = [optionIndex];
+          questionStyles[questionKey] = "bg-success";
+        };
+
+        // Handle MCQ Toggle
+        const handleMCQToggle = (questionKey, optionIndex) => {
+          const idx = userResponses[questionKey].answer.indexOf(optionIndex);
+          if (idx === -1) {
+            userResponses[questionKey].answer.push(optionIndex);
+          } else {
+            userResponses[questionKey].answer.splice(idx, 1);
+          }
+
+          questionStyles[questionKey] =
+            userResponses[questionKey].answer.length > 0 ? "bg-success" : "bg-danger";
+        };
+
+        // Check if all questions are answered
+        const allQuestionsAnswered = computed(() =>
+          Object.keys(props.questions).every((key) => {
+            const response = userResponses[key].answer;
+            return props.questions[key].type === "SCQ" ||
+              props.questions[key].type === "MCQ"
+              ? response.length > 0
+              : response.trim().length > 0;
+          })
+        );
+
+        // Submit Quiz
+        const submitQuiz = () => {
+          if (!allQuestionsAnswered.value) {
+            alert("Please answer all questions before submitting.");
+            return;
+          }
+          const time_taken_for_quiz = elapsedSeconds.value;
+          emit('quizactivetoggle', !props.quizActive);
+
+          stopTimer();
+
+          const finalResponses = {};
+
+          for (const key in props.questions) {
+            const question = props.questions[key];
+            const userResponse = userResponses[key];
+
+            if (question.type === "SCQ") {
+              // For SCQ: If selected answer is correct, assign 1 mark, else 0
+              finalResponses[key] = {
+                answer: userResponse.answer,
+                mark: question.options[userResponse.answer[0]].is_correct ? 1 : 0,
+                pending_checking: false
+              };
+            } else if (question.type === "MCQ") {
+              // For MCQ: Find the total number of correct answers
+              const correctAnswers = question.options.filter(opt => opt.is_correct).length;
+
+              // Calculate the marks for selected answers
+              let totalMarks = 0;
+              userResponse.answer.forEach(optionIndex => {
+                const option = question.options[optionIndex];
+                if (option.is_correct) {
+                  totalMarks += 1 / correctAnswers; // Positive mark for correct answers
+                } else {
+                  totalMarks -= 1 / (correctAnswers); // Negative mark for incorrect answers
+                }
+              });
+
+              finalResponses[key] = {
+                answer: userResponse.answer,
+                mark: parseFloat(totalMarks.toFixed(2)),
+                pending_checking: false
+              };
+            } else {
+              // For FIB and OLA: Keep marks 0
+              finalResponses[key] = {
+                answer: userResponse.answer,
+                mark: 0,
+                pending_checking: true
+              };
+            }
+          }
+
+          emit("submitQuiz", {
+            responses: finalResponses,
+            timeTaken: time_taken_for_quiz,
+            status: "submitted"
+          });
+          alert("Quiz submitted successfully!");
+        };
+
+        onMounted(() => {
+
+          // start timer for the elapsed time since upload
+          console.log((new Date() - about_quiz_parsed.value.upload_time_raw) / 1000)
+          intervalId_since_upload.value = setInterval(() => {
+            elapsedSeconds_since_upload.value = Math.floor((new Date() - about_quiz_parsed.value.upload_time_raw) / 1000);
+          }, 1000);
+        });
+
+        onUnmounted(() => {
+          // clear the clock
+          clearInterval(intervalId_since_upload.value);
+          intervalId_since_upload.value = null;
+          elapsedSeconds.value = 0;
+        });
+
+
+        return {
+          elapsedTime,
+          about_quiz_parsed,
+
+          userResponses,
+          questionStyles,
+          toggle_startQuiz,
+          handleSCQSelection,
+          handleMCQToggle,
+          allQuestionsAnswered,
+          submitQuiz
+        };
+      },
+      // attemptquiz template
+      template: `
+ <div class="mt-4">
+
+    <div class="card shadow-lg p-4 text-center">
+        <h2 class="mb-4 fw-bold">📜 Quiz Details</h2>
+
+        <div class="row g-4">
+            <!-- Uploaded Time -->
+            <div class="col-md-6 col-12">
+                <div class="p-3 border rounded shadow-sm bg-light">
+                    <i class="bi bi-calendar-check display-6 text-primary"></i>
+                    <h5 class="mt-2">Uploaded On</h5>
+                    <p class="fs-5 fw-semibold">{{ about_quiz_parsed.upload_time }}</p>
+                </div>
+            </div>
+
+            <!-- Time Elapsed -->
+            <div class="col-md-6 col-12">
+                <div class="p-3 border rounded shadow-sm bg-light">
+                    <i class="bi bi-hourglass-split display-6 text-danger"></i>
+                    <h5 class="mt-2">Time Elapsed</h5>
+                    <p class="fs-3 fw-bold text-danger">{{ about_quiz_parsed.elapsed_time }}</p>
+                </div>
+            </div>
+
+            <!-- Devotees Answered -->
+            <div class="col-md-6 col-12">
+                <div class="p-3 border rounded shadow-sm bg-light">
+                    <i class="bi bi-people display-6 text-success"></i>
+                    <h5 class="mt-2">Devotees Answered</h5>
+                    <p class="fs-4 fw-semibold text-success">{{ about_quiz_parsed.submitted_count }}</p>
+                </div>
+            </div>
+
+            <!-- Created By -->
+            <div class="col-md-6 col-12">
+                <div class="p-3 border rounded shadow-sm bg-light">
+                    <i class="bi bi-person-circle display-6 text-warning"></i>
+                    <h5 class="mt-2">Created By</h5>
+                    <p class="fs-5 fw-semibold"></p>
+                </div>
+            </div>
+
+            <!-- Section -->
+            <div class="col-12">
+                <div class="p-3 border rounded shadow-sm bg-light">
+                    <i class="bi bi-book display-6 text-info"></i>
+                    <h5 class="mt-2">Section</h5>
+                    <p class="fs-5 fw-semibold"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start Quiz Button -->
+        <button class="btn btn-primary btn-lg mt-4 shadow" @click="toggle_startQuiz">
+            {{ quizActive ? 'Deactivate' : '🚀 Attempt Quiz Now' }}
+        </button>
+    </div>
+
+
+    <div v-if="quizActive">
+        <span class="badge bg-info fs-5">Time Elapsed: {{ elapsedTime }}</span>
+        <div v-for="(question, key) in questions" :key="key" class="card mb-3" :class="questionStyles[key]">
+            <div class="card-body">
+                <h5 class="card-title">{{ question.question }}</h5>
+                <!-- SCQ -->
+                <div v-if="question.type === 'SCQ'">
+                    <div v-for="(option, index) in question.options" :key="index" class="form-check">
+                        <input type="radio" class="form-check-input" :name="key" :id="key + '-' + index"
+                            @change="handleSCQSelection(key, index)"
+                            :checked="userResponses[key].answer.includes(index)" />
+                        <label class="form-check-label" :for="key + '-' + index">
+                            {{ option.value }}
+                        </label>
+                    </div>
+                </div>
+                <!-- MCQ -->
+                <div v-if="question.type === 'MCQ'">
+                    <div v-for="(option, index) in question.options" :key="index" class="form-check">
+                        <input type="checkbox" class="form-check-input" :id="key + '-' + index"
+                            @change="handleMCQToggle(key, index)"
+                            :checked="userResponses[key].answer.includes(index)" />
+                        <label class="form-check-label" :for="key + '-' + index">
+                            {{ option.value }}
+                        </label>
+                    </div>
+                </div>
+                <!-- FIB -->
+                <div v-if="question.type === 'FIB'">
+                    <input type="text" class="form-control" v-model="userResponses[key].answer"
+                        placeholder="Enter your answer" />
+                </div>
+                <!-- OLA -->
+                <div v-if="question.type === 'OLA'">
+                    <textarea class="form-control" rows="3" v-model="userResponses[key].answer"
+                        placeholder="Enter your answer"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-success w-100" :disabled="!allQuestionsAnswered" @click="submitQuiz">
+            Submit Quiz
+        </button>
+    </div>
+</div>
+  `
+    };
+
+    // PreviewQuiz Component
+    const PreviewQuiz = {
+      props: {
+        mySubmission: {
+          type: Object,
+          required: true
+        },
+        questions: {
+          type: Object,
+          required: true
+        },
+        aboutQuiz: {
+          type: Object,
+          required: true
+        }
+      },
+      setup(props) {
+        // Format the upload time (assuming it's in UTC)
+        const formattedUploadTime = computed(() => {
+          const date = new Date(props.aboutQuiz.upload_time);
+          return date.toLocaleString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true
+          });
+        });
+
+        // Check if the answer is correct
+        const isCorrectAnswer = (questionId, answer) => {
+          if (props.questions[questionId].type === 'SCQ' || props.questions[questionId].type === 'MCQ') {
+            const correctAnswers = props.questions[questionId].options.filter(option => option.is_correct);
+            return correctAnswers.some(option => option.value === answer);
+          }
+        };
+
+        // Check if the answer is incorrect
+        const isIncorrectAnswer = (questionId, answer) => {
+          if (props.questions[questionId].type === 'SCQ' || props.questions[questionId].type === 'MCQ') {
+            const correctAnswers = props.questions[questionId].options.filter(option => option.is_correct);
+            return !correctAnswers.some(option => option.value === answer) && props.mySubmission.responses[questionId].answer.includes(answer);
+          }
+        };
+
+
+        // Button click handler to ask about a question (redirect to a link)
+        const askQuestionLink = (questionId) => {
+          const questionLink = `https://your-link-to-ask-question/${questionId}`; // Edit this link as per your need
+          window.open(questionLink, '_blank');
+        };
+
+        // Button click handler to provide feedback about the question
+        const provideFeedback = (questionId) => {
+          const feedbackLink = `https://your-feedback-link/${questionId}`; // Edit this link as per your need
+          window.open(feedbackLink, '_blank');
+        };
+
+        return {
+          formattedUploadTime,
+          isCorrectAnswer,
+          isIncorrectAnswer,
+          askQuestionLink,
+          provideFeedback
+        };
+      },
+      template: `
+        <div class="container mt-5">
+          <div class="card shadow-lg p-4 review_card">
+            <h3 class="mb-4 text-center review_title">Quiz Review</h3>
+            
+            <!-- Upload Time -->
+            <div class="mb-4">
+              <h5 class="fw-bold review_subtitle">Quiz Upload Time:</h5>
+              <p class="text-muted review_upload_time">{{ formattedUploadTime }}</p>
+            </div>
+
+            <!-- Questions Review -->
+            <div v-for="(question, questionId) in questions" :key="questionId" class="mb-4 review_question_container">
+              <div v-if="question.type === 'SCQ'" class="mb-3 review_scq">
+                <!-- SCQ Question -->
+                <h6 class="fw-semibold review_question">{{ questionId }}. {{ question.question }}</h6>
+                <div class="list-group review_options">
+                  <div
+                    v-for="(option, index) in question.options"
+                    :key="index"
+                    :class="[
+                      'list-group-item review_option',
+                      isCorrectAnswer(questionId, option.value) ? 'bg-success text-white' : '',
+                      isIncorrectAnswer(questionId, option.value) ? 'bg-danger text-white' : '',
+                    ]"
+                  >
+                    {{ option.value }}
+                  </div>
+                </div>
+                <!-- Ask about this question and Feedback -->
+                <div class="mt-2 review_buttons">
+                  <button class="btn btn-link text-decoration-none review_ask_button" @click="askQuestionLink(questionId)">
+                    Ask about this question
+                  </button>
+                  <button class="btn btn-outline-info ms-2 review_feedback_button" @click="provideFeedback(questionId)">
+                    Feedback
+                  </button>
+                </div>
+              </div>
+              
+              <div v-else-if="question.type === 'MCQ'" class="mb-3 review_mcq">
+                <!-- MCQ Question -->
+                <h6 class="fw-semibold review_question">{{ questionId }}. {{ question.question }}</h6>
+                <div class="list-group review_options">
+                  <div
+                    v-for="(option, index) in question.options"
+                    :key="index"
+                    :class="[
+                      'list-group-item review_option',
+                      isCorrectAnswer(questionId, option.value) ? 'bg-success text-white' : '',
+                      isIncorrectAnswer(questionId, option.value) ? 'bg-danger text-white' : '',
+                    ]"
+                  >
+                    {{ option.value }}
+                  </div>
+                </div>
+                <!-- Ask about this question and Feedback -->
+                <div class="mt-2 review_buttons">
+                  <button class="btn btn-link text-decoration-none review_ask_button" @click="askQuestionLink(questionId)">
+                    Ask about this question
+                  </button>
+                  <button class="btn btn-outline-info ms-2 review_feedback_button" @click="provideFeedback(questionId)">
+                    Feedback
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Future question types can be added here with v-else-if -->
+            </div>
+
+            <!-- Quiz Status -->
+            <div class="mt-4 review_status_container">
+              <h5 class="fw-bold review_status_title">Status:</h5>
+              <p :class="{'text-success': mySubmission.status === 'submitted', 'text-danger': mySubmission.status !== 'submitted'}" class="review_status">
+                {{ mySubmission.status === 'submitted' ? 'Submitted' : 'Pending' }}
+              </p>
+            </div>
+          </div>
+        </div>
+      `
+    };
+
+    // Leaderboard Component
+    const Leaderboard = {
+      template: `
+  <div>
+    <h2>Leaderboard</h2>
+  </div>
+  `
+    };
+
+    // Main App
+    const app = Vue.createApp({
+      components: {
+        UserInfo,
+        Spinner,
+        DateSelector,
+        AttemptQuiz,
+        PreviewQuiz,
+        Leaderboard,
+      },
+      setup() {
+        //  about the user
+        const KYClient = ref({
+          status: "not_verified",
+          creds: {}
+        });
+
+        // pick the date
+        const date_list = ref([]);
+        const selectedDate = ref(null);
+
+        // attemp/preview quiz and leaderboard statemanagement
+        const activeMode = ref('attempt');
+        const isQuizActive = ref(false);
+
+        // ...loading
+        const spinnerStatus = ref({
+          is_loading: false,
+          msg: ""
+        });
+
+        // full database which is fetched from server. this is only for the active week [Mon-Sun]
+        // Later we may also pull historical data for historical preview and leaderboard-view
+        const qnadatabase = ref({});
+
+        // ------------------computed values
+        // data for active date
+        const qna_data_for_selectedDate = computed(() => {
+          if (selectedDate.value) {
+            return {
+              questions: qnadatabase.value[selectedDate.value].qna,
+              metadata: {
+                upload_time: qnadatabase.value[selectedDate.value].upload_time,
+                edit_row: qnadatabase.value[selectedDate.value].edit_row,
+              },
+              submissions: {
+                mySubmission: qnadatabase.value[selectedDate.value].answer_by_user[KYClient.value.creds.username.value],
+                allSubmission: qnadatabase.value[selectedDate.value].answer_by_user
+              }
+            }
+          }
+          else {
+            return {}
+          }
+        });
+
+        // Handler functions
+        const handle_date_select = (date_picked) => {
+          selectedDate.value = date_picked;
+          if (qna_data_for_selectedDate.value.submissions.mySubmission.status === 'pending') {
+            activeMode.value = 'attempt';
+          }
+          else {
+            activeMode.value = 'preview';
+          }
+        };
+
+        const submitQuiz = (payload) => {
+          spinnerStatus.value = { is_loading: true, msg: "Submitting Quiz" };
+
+          // console.log(payload)
+          // console.log(JSON.stringify(payload))
+          // console.log(qna_data_for_selectedDate.value.metadata.edit_row)
+          // console.log(KYClient.value.creds.db_col.value)
+
+          const upload_material = {
+            ...payload,
+            upload_time: 'to_be_filled_by_server'
+          }
+          const upload_row = qna_data_for_selectedDate.value.metadata.edit_row;
+          const upload_column = KYClient.value.creds.db_col.value;
+
+          // google.script.run.withSuccessHandler((response) => {
+          //   if (response.status === 'success') {
+          //     // Successfully submitted
+          //     newQuestions.value = {}
+          //   } else if (response.status == "failed") {
+          //     // some error
+          //     // console.log("Failed submission")
+          //   }
+          // }).withFailureHandler(() => {
+          //   // console.log('An unknown error occurred during uploading.');
+          // }).qna_upload_to_cell(JSON.stringify(upload_material), upload_row, upload_column);
+
+          alert('Quiz submitted!');
+          spinnerStatus.value = { is_loading: false, msg: "" };
+
+        };
+
+
+
+        const fetchDataFromServer = () => {
+
+          // to run locally use this snippet
+          localdatabase = JSON.parse(
+            `{"new_date_row":"5","date_list":["1737763200|2025-01-25|Jan 25, Sat","1737849600|2025-01-26|Jan 26, Sun","1738022400|2025-01-28|Jan 28, Tue"],"fulldb":{"1737763200|2025-01-25|Jan 25, Sat":{"answer_by_user":{"parth":{"status":"pending"},"shiven":{"status":"pending"}},"upload_time":"2025-01-27T10:52:23","creator":{"db_col":{"addr":"E3","value":6},"password":{"addr":"C3","value":"108"},"display_name":{"addr":"D3","value":"Shivendra Pr"},"username":{"addr":"B3","value":"shiven"}},"qna":{"Q1":{"question":"is science against spirituality?","options":[{"value":"No science is not against","is_correct":true},{"value":"yes. for some atheist scientiest","is_correct":false}],"type":"MCQ"}},"edit_row":2},"1737849600|2025-01-26|Jan 26, Sun":{"upload_time":"2025-01-27T15:53:34","answer_by_user":{"parth":{"upload_time":"to_be_filled_by_server","timeTaken":10,"responses":{"Q1":{"answer":[2],"pending_checking":false,"mark":0},"Q2":{"answer":"Krishna or God","pending_checking":true,"mark":0}},"status":"submitted"},"shiven":{"timeTaken":10,"upload_time":"to_be_filled_by_server","responses":{"Q1":{"answer":[3],"pending_checking":false,"mark":0},"Q2":{"answer":"Krishna","pending_checking":true,"mark":0}},"status":"submitted"}},"creator":{"db_col":{"addr":"E3","value":6},"password":{"addr":"C3","value":"108"},"display_name":{"addr":"D3","value":"Shivendra Pr"},"username":{"addr":"B3","value":"shiven"}},"qna":{"Q1":{"question":"Who is supreme?","options":[{"value":"Brahma","is_correct":false},{"value":"Vishnu","is_correct":true},{"value":"Mahesh","is_correct":false},{"value":"everyone is God","is_correct":false}],"type":"SCQ"},"Q2":{"question":"Everyone is looking for BLANK some know and some don't","options":[{"value":"Krishna","is_correct":true},{"value":"Govinda","is_correct":true}],"type":"FIB"}},"edit_row":3},"1738022400|2025-01-28|Jan 28, Tue":{"answer_by_user":{"parth":{"status":"pending"},"shiven":{"status":"pending"}},"upload_time":"2025-01-28T09:52:28","creator":{"db_col":{"addr":"E3","value":6},"password":{"addr":"C3","value":"108"},"display_name":{"addr":"D3","value":"Shivendra Pr"},"username":{"addr":"B3","value":"shiven"}},"qna":{"Q1":{"question":"Who is God?","options":[{"value":"Krishna","is_correct":true},{"value":"Indra","is_correct":false},{"value":"Varuna","is_correct":false},{"value":"Everyone","is_correct":false}],"type":"SCQ"},"Q2":{"question":"What are real problems","options":[{"value":"exams","is_correct":false},{"value":"birth","is_correct":true},{"value":"old age","is_correct":true},{"value":"disease","is_correct":true}],"type":"MCQ"},"Q3":{"question":"right way to gain knowledge is by BLANK","options":[{"value":"approaching a guru","is_correct":true}],"type":"FIB"},"Q4":{"question":"What is essence of all knowledge","options":[{"value":"To know Krishna","is_correct":true}],"type":"OLA"}},"edit_row":4}},"status":"success"}`
+          )
+          date_list.value = localdatabase.date_list;
+          selectedDate.value = date_list.value[date_list.value.length - 1];
+          qnadatabase.value = localdatabase.fulldb;
+
+
+          // // to run on server do this
+
+          // // Call the Google Apps Script API to fetch data
+          // google.script.run.withSuccessHandler((response) => {
+          // // Handle success response
+          // if (response.status === "success") {
+          // // got the data correctly
+          // // status: "success",
+          // // date_list: date_list,
+          // // new_date_row: (active_db_last_row + 1).toFixed(0),
+          // // userdb: user_data_date_wise
+          // date_list.value = response.date_list;
+          // qnadatabase.value = response.fulldb;
+          // }
+          // }
+          // ).withFailureHandler((error) => {
+          // // Handle error
+          // // console.log("Error fetching data: ", error);
+          // }).qna_get_qnadb();
+          // // // console.log("fetched completed")
+        };
+        onMounted(() => {
+
+          if (localStorage.getItem('creds') !== null) {
+            KYClient.value = {
+              status: "verified",
+              creds: JSON.parse(localStorage.getItem('creds'))
+            };
+
+            fetchDataFromServer();
+
+          }
+          else {
+            // simulated logged in user
+            // uncomment only to test the script
+            fetchDataFromServer();
+            KYClient.value = {
+              status: "verified",
+              // // credential for Shivendra
+              // creds:
+              creds: JSON.parse(`{"db_col":{"addr":"E3","value":6},"password":{"addr":"C3","value":"108"},"display_name":{"addr":"D3","value":"Shivendra  Pr"},"username":{"addr":"B3","value":"shiven"}}`)
+
+              // credential for Parth Pr
+              // parth 198 Parth Pr 7 user
+              // creds: JSON.parse(`{"db_col":{"addr":"E4","value":7},"password":{"addr":"C4","value":"198"},"display_name":{"addr":"D4","value":"Parth Pr"},"username":{"addr":"B4","value":"parth"}}`)
+            };
+            // fetchDataFromServer();
+          }
+        });
+
+        return {
+          KYClient,
+          date_list,
+          selectedDate,
+          activeMode,
+
+          qna_data_for_selectedDate,
+          isQuizActive,
+
+          spinnerStatus,
+
+          //  handler functions
+          handle_date_select,
+          submitQuiz,
+        };
+      },
+
+      // main app template
+      template: `
+<Spinner :isLoading="spinnerStatus.is_loading" :message="spinnerStatus.msg" />
+
+<!-- unverified users -->
+<div v-if="KYClient.status !== 'verified'" class="d-flex justify-content-center align-items-center vh-100 bg-light">
+    <div class="text-center p-4 border rounded shadow bg-white">
+        <h5 class="mb-3">You are not logged in</h5>
+        <p>Please login first to continue.</p>
+    </div>
+</div>
+<!-- user is verified -->
+<div v-else>
+
+    <!-- hide the user-info, date selector and navigation bar while attemptign quiz -->
+    <div v-if="!isQuizActive">
+
+        <UserInfo :user="KYClient" />
+        <DateSelector :dates="date_list" :date_selected="selectedDate"
+          @dateSelected="handle_date_select" />
+
+        <div class="nav-bar">
+            <!-- Check if quiz is pending or not and give attempt or preview option -->
+            <button v-if="qna_data_for_selectedDate.submissions.mySubmission.status==='pending'"
+                :class="{ active: activeMode === 'attempt' }" @click="activeMode = 'attempt'"
+                > Attempt Quiz</button>
+
+            <button v-else :class="{ active: activeMode === 'preview' }" @click="activeMode = 'preview'"
+                >Review Solution</button>
+
+            <button :class="{ active: activeMode === 'leaderboard' }" @click="activeMode = 'leaderboard'"
+                >Leaderboard</button>
+        </div>
+    </div>
+
+    <!-- Show one of the three options Attempt quiz, Preview Quiz or leaderboard -->
+    <AttemptQuiz v-if="activeMode === 'attempt' " :questions="qna_data_for_selectedDate.questions"
+        :quizActive="isQuizActive" :about_question="qna_data_for_selectedDate.metadata"
+        :submissions="qna_data_for_selectedDate.submissions" @submitQuiz="submitQuiz"
+        @quizactivetoggle="isQuizActive = $event" />
+
+    <PreviewQuiz v-else-if="activeMode === 'preview'"
+    :questions="qna_data_for_selectedDate.questions"
+    :mySubmission="qna_data_for_selectedDate.submissions.mySubmission"
+    :aboutQuiz="qna_data_for_selectedDate.metadata"
+    />
+
+    <Leaderboard v-else-if="activeMode === 'leaderboard'" />
+
+</div>
+`
+    });
+
+    app.mount('#app');
+  </script>
+
+</body>
+
+</html>
