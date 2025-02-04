@@ -84,23 +84,23 @@
             const SCQ = {
                 props: {
                     // mode of component. edit, attempt, show
-                    mode: {
+                    std_mode: {
                         type: String,
                         required: true
                     },
 
                     // this is for creating question
-                    _questionCreationKey: {
+                    std_questionCreationKey: {
                         type: String
                     },
 
                     // this is for editQuestion, attemptQuiz, reviewQuiz
-                    _questionData: {
+                    std_questionData: {
                         type: Object
                     },
 
                     // this is for reviewQuiz
-                    _answerData: {
+                    std_answerData: {
                         type: Object
                     }
                 },
@@ -168,10 +168,11 @@
                     };
 
                     // -----------------for attempt mode
-                    if (props.mode === 'attempt') {
+                    if (props.std_mode !== 'edit') {
                         // update the questionTitle and options
-                        questionTitle.value = props._questionData.title;
-                        optionList.value = props._questionData.optionList;
+                        // for attempt and show mode
+                        questionTitle.value = props.std_questionData.title;
+                        optionList.value = props.std_questionData.optionList;
                     }
                     const selectedOption = ref(-1);
                     const updateUserSelection = (answerIndex) => {
@@ -200,116 +201,197 @@
                 },
 
                 template: `
- <div class="container my-4">
+<div class="container my-4">
 
-    <div v-if="mode==='edit'">
-        <!-- Question Container -->
-        <div class="p-4 border-2 rounded question-container"
-            :class="validationErrors.valid_overall ? 'bg-success-subtle' : 'bg-danger-subtle'">
+<div v-if="std_mode==='edit'">
+<!-- Question Container -->
+<div class="p-4 border-2 rounded question-container"
+:class="validationErrors.valid_overall ? 'bg-success-subtle' : 'bg-danger-subtle'">
 
-            <!-- Question Title -->
-            <div class="mb-4">
-                <!-- <label for="questionTitle" class="form-label fw-bold"></label>-->
-                <textarea id="questionTitle" v-model="questionTitle" class="form-control" rows="3"
-                    placeholder="Enter your question here..."></textarea>
-                <div v-if="validationErrors.questionTitle" class="text-danger">
-                    {{ validationErrors.questionTitle }}
-                </div>
-            </div>
+<!-- Question Title -->
+<div class="mb-4">
+    <!-- <label for="questionTitle" class="form-label fw-bold"></label>-->
+    <textarea id="questionTitle" v-model="questionTitle" class="form-control" rows="3"
+        placeholder="Enter your question here..."></textarea>
+    <div v-if="validationErrors.questionTitle" class="text-danger">
+        {{ validationErrors.questionTitle }}
+    </div>
+</div>
 
-            <!-- <transition-group name="custom-transition" tag="div"> -->
-            <!-- Option List -->
-            <div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
-                :class="{'border-success bg-success-subtle': option.isCorrect}">
-                <!-- Option Input -->
-                <input v-model="option.text" type="text" class="form-control mb-2" placeholder="Enter option text">
-                <div v-if="validationErrors.options[index]" class="text-danger">
-                    {{ validationErrors.options[index] }}
-                </div>
-
-                <!-- Buttons (Stacked on Mobile) -->
-                <div class="d-flex flex-column flex-sm-row gap-2">
-                    <button class="btn btn-outline-success" @click="toggle_is_correct(index)">
-                        {{ option.isCorrect ? 'Mark incorrect' : 'Mark correct' }}
-                    </button>
-                    <button v-if="optionList.length>2" class="btn btn-outline-danger" @click="remove_option(index)">
-                        Remove
-                    </button>
-                </div>
-            </div>
-            <!-- </transition-group> -->
-
-            <!-- Error for correct option selection  -->
-            <div v-if="!validationErrors.valid_overall" class="text-danger mt-2">
-                {{ validationErrors.errormsg_overall }}
-            </div>
-
-            <!-- Add Option Button -->
-            <button class="btn btn-outline-primary mt-3" @click="add_option">
-                Add Option
-            </button>
-        </div>
+<!-- <transition-group name="custom-transition" tag="div"> -->
+<!-- Option List -->
+<div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
+    :class="{'border-success bg-success-subtle': option.isCorrect}">
+    <!-- Option Input -->
+    <input v-model="option.text" type="text" class="form-control mb-2" placeholder="Enter option text">
+    <div v-if="validationErrors.options[index]" class="text-danger">
+        {{ validationErrors.options[index] }}
     </div>
 
-    <div v-else-if="mode === 'attempt'">
-        <!-- Question Container -->
-        <div class="p-4 border-2 rounded question-container"
-            :class="selectedOption !== null ? 'bg-success-subtle' : 'bg-danger-subtle'">
-
-            <!-- Question Title (Read-Only) -->
-            <div class="mb-4">
-                <p class="fw-bold">{{ questionTitle }}</p>
-            </div>
-
-            <!-- Option List -->
-            <div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
-                :class="{'border-warning bg-warning-subtle': selectedOption === index}"
-                @click="updateUserSelection(index)">
-                <!-- Selectable Options -->
-                <label class="form-check-label">
-                    {{ option.text }}
-                </label>
-            </div>
-            <!-- Error Message if No Option is Selected -->
-            <div v-if="selectedOption===-1" class="text-danger mt-2">
-                Please select at least one option.
-            </div>
-
-        </div>
+    <!-- Buttons (Stacked on Mobile) -->
+    <div class="d-flex flex-column flex-sm-row gap-2">
+        <button class="btn btn-outline-success" @click="toggle_is_correct(index)">
+            {{ option.isCorrect ? 'Mark incorrect' : 'Mark correct' }}
+        </button>
+        <button v-if="optionList.length>2" class="btn btn-outline-danger" @click="remove_option(index)">
+            Remove
+        </button>
     </div>
+</div>
+<!-- </transition-group> -->
 
-    <div v-else-if="mode==='show'">
-        <!-- Question Container -->
-        <div class="p-4 border-2 rounded question-container"
-            :class="_answerData._mark_obtained===1? 'bg-success-subtle' : 'bg-danger-subtle'">
+<!-- Error for correct option selection  -->
+<div v-if="!validationErrors.valid_overall" class="text-danger mt-2">
+    {{ validationErrors.errormsg_overall }}
+</div>
 
-            <!-- Question Title (Read-Only) -->
-            <div class="mb-4">
-                <p class="fw-bold">{{ questionTitle }}</p>
-            </div>
+<!-- Add Option Button -->
+<button class="btn btn-outline-primary mt-3" @click="add_option">
+    Add Option
+</button>
+</div>
+</div>
 
-            <!-- Option List -->
-            <div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
-            :class="[
-                        selectedOption === _answerData.selectedOptionIndex ? 'border-warning bg-warning-subtle' : '',
-                        option.isCorrect ? 'bg-success-subtle' : 'bg-danger-subtle'
-                    ]"
-             >
-                <!-- Selectable Options -->
-                <label class="form-check-label">
-                    {{ option.text }} {{option.isCorrect?'(correct answer)':''}}
-                </label>
-            </div>
-        </div>
+<div v-else-if="std_mode === 'attempt'">
+<!-- Question Container -->
+<div class="p-4 border-2 rounded question-container"
+:class="selectedOption !== null ? 'bg-success-subtle' : 'bg-danger-subtle'">
 
-    </div>
-    </div>
-  `
+<!-- Question Title (Read-Only) -->
+<div class="mb-4">
+    <p class="fw-bold">{{ questionTitle }}</p>
+</div>
+
+<!-- Option List -->
+<div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
+    :class="{'border-warning bg-warning-subtle': selectedOption === index}"
+    @click="updateUserSelection(index)">
+    <!-- Selectable Options -->
+    <label class="form-check-label">
+        {{ option.text }}
+    </label>
+</div>
+<!-- Error Message if No Option is Selected -->
+<div v-if="selectedOption===-1" class="text-danger mt-2">
+    Please select at least one option.
+</div>
+
+</div>
+</div>
+
+<div v-else-if="std_mode==='show'">
+<!-- Question Container -->
+<div class="p-4 border-2 rounded question-container"
+:class="std_answerData._mark_obtained===1? 'bg-success-subtle' : 'bg-danger-subtle'">
+
+<!-- Question Title (Read-Only) -->
+<div class="mb-4">
+    <p class="fw-bold">{{ questionTitle }}</p>
+</div>
+
+<!-- Option List -->
+<div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
+:class="[
+        index === std_answerData.selectedOptionIndex ? 'bg-warning-subtle' : '',
+        option.isCorrect ? 'border border-5 border-success rounded p-3' : ''
+        ]"
+ >
+    <!-- Selectable Options -->
+    <label class="form-check-label">
+        {{ option.text }} {{index === std_answerData.selectedOptionIndex?'(your answer)':''}}{{option.isCorrect?'(correct answer)':''}}
+    </label>
+</div>
+</div>
+
+</div>
+</div>
+`
             };
+
+            const Qwrapper = {
+                // mode of component. edit, attempt, show
+                components: {
+                    SCQ
+                },
+                std_qtype: {
+                    type: String,
+                    required: true
+                },
+                std_mode: {
+                    type: String,
+                    required: true
+                },
+
+                // this is for creating question
+                std_questionCreationKey: {
+                    type: String
+                },
+
+                // this is for editQuestion, attemptQuiz, reviewQuiz
+                std_questionData: {
+                    type: Object
+                },
+
+                // this is for reviewQuiz
+                std_answerData: {
+                    type: Object
+                },
+                emits: ['createdQuestion', 'attemptedQuestion'],
+                setup(props, { emits }) {
+                    const pass_createdQuestion = (data) => {
+                        emit('createdQuestion', data)
+                    };
+                    const pass_attemptedQuestion = (data) => {
+                        emit('attemptedQuestion', data)
+                    };
+
+                    return {
+                        pass_attemptedQuestion,
+                        pass_createdQuestion
+
+                    };
+                },
+                template:
+                    `
+<div>
+    <!-- for edit mode -->
+    <div v-if="std_mode==='edit'">
+        <!-- check if question type is SCQ -->
+        <div v-if="std_qtype==='SCQ'">
+            <SCQ :std_mode="'edit'" :std_questionCreationKey="std_questionCreationKey"
+            @createdQuestion="pass_createdQuestion" />
+        </div>
+        <!-- other types -->
+    </div>
+
+    <!-- for attemp mode -->
+    <div v-else-if="std_mode==='attempt'">
+        <!-- check if question type is SCQ -->
+        <div v-if="std_qtype==='SCQ'">
+            <SCQ :std_mode="'attempt'" :std_questionData="std_questionData"
+                @attemptedQuestion="pass_attemptedQuestion" />
+        </div>
+
+    </div>
+    <!-- for show mode -->
+    <div v-else-if="std_mode==='show'">
+
+        <!-- check if question type is SCQ -->
+        <div v-if="qtype==='SCQ'">
+            <SCQ :std_mode="'show'" :std_questionData="std_questionData"
+                :std_answerData="std_answerData" />
+        </div>
+
+    </div>
+</div>
+
+                    `
+
+            }
 
             const createQuiz = {
                 components: {
-                    SCQ
+                    Qwrapper
                 },
                 props: {
                 },
@@ -446,7 +528,11 @@
 
         <!-- Render Question Component Based on Type -->
         <div v-if="question._qtype==='SCQ'">
-            <SCQ :mode="'edit'" :_questionCreationKey="key" @createdQuestion="updateQuestion(key,$event)" />
+            <!--<SCQ :std_mode="'edit'" :std_questionCreationKey="key"  />-->
+            <Qwrapper
+                :std_mode="'edit"
+                :std_questionCreationKey="key"
+                @createdQuestion="updateQuestion(key,$event)"
         </div>
 
     </div>
@@ -558,7 +644,7 @@
 
         <!-- Render Question Component Based on Type -->
         <div v-if="question._qtype==='SCQ'">
-            <SCQ :mode="'attempt'" :_questionData="question._qdata"
+            <SCQ :std_mode="'attempt'" :std_questionData="question._qdata"
                 @attemptedQuestion="updateUserResponse(key,$event)" />
         </div>
 
@@ -635,7 +721,9 @@
 
         <!-- Render Question Component Based on Type -->
         <div v-if="question._qtype==='SCQ'">
-            <SCQ :mode="'show'" :_questionData="question._qdata" :_answerData="quizAnswerData[key]._answerData" />
+            {{console.log(question._qdata)}}
+            {{console.log(quizAnswerData[key]._answerData)}}
+            <SCQ :std_mode="'show'" :std_questionData="question._qdata" :std_answerData="quizAnswerData[key]._answerData" />
         </div>
 
         <div v-else>
