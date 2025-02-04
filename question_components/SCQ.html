@@ -79,7 +79,7 @@
     <div id="app" class="app-container">
 
         <script>
-            const { ref, reactive, onMounted, computed, onUnmounted } = Vue;
+            const { ref, onMounted, computed, onUnmounted } = Vue;
 
             const SCQ = {
                 props: {
@@ -97,9 +97,12 @@
                     // this is for editQuestion, attemptQuiz, reviewQuiz
                     _questionData: {
                         type: Object
-                    }
+                    },
 
                     // this is for reviewQuiz
+                    _answerData: {
+                        type: Object
+                    }
                 },
                 emits: ['createdQuestion', 'attemptedQuestion'],
                 setup(props, { emit }) {
@@ -110,6 +113,7 @@
                         { text: '', isCorrect: false },
                         { text: '', isCorrect: false }
                     ]);
+
 
                     const validationErrors = computed(() => {
 
@@ -164,24 +168,33 @@
                     };
 
                     // -----------------for attempt mode
+                    if (props.mode === 'attempt') {
+                        // update the questionTitle and options
+                        questionTitle.value = props._questionData.title;
+                        optionList.value = props._questionData.optionList;
+                    }
                     const selectedOption = ref(-1);
-                    const updateUserSelection = computed(() => {
+                    const updateUserSelection = (answerIndex) => {
+                        selectedOption.value = answerIndex;
+
                         if (selectedOption.value > -1) {
                             // have selection something
                             emit('attemptedQuestion', {
                                 _have_answered: true,
                                 _mark_obtained: optionList.value[selectedOption.value]?.isCorrect ? 1 : 0,
-                                selectedOptionIndex: selectedOption
+                                selectedOptionIndex: selectedOption.value
                             })
                         }
-                    });
+                    };
 
                     return {
                         // used while creating the question
                         questionTitle,
                         optionList,
                         add_option, remove_option, toggle_is_correct,
-                        validationErrors
+                        validationErrors,
+                        selectedOption,
+                        updateUserSelection
 
                     };
                 },
@@ -204,29 +217,27 @@
                 </div>
             </div>
 
-            <transition-group name="custom-transition" tag="div">
-                <!-- Option List -->
-                <div v-for="(option, index) in optionList" :key="index"
-                    class="p-3 border-1 option-container rounded mb-2"
-                    :class="{'border-success bg-success-subtle': option.isCorrect}">
-
-                    <!-- Option Input -->
-                    <input v-model="option.text" type="text" class="form-control mb-2" placeholder="Enter option text">
-                    <div v-if="validationErrors.options[index]" class="text-danger">
-                        {{ validationErrors.options[index] }}
-                    </div>
-
-                    <!-- Buttons (Stacked on Mobile) -->
-                    <div class="d-flex flex-column flex-sm-row gap-2">
-                        <button class="btn btn-outline-success" @click="toggle_is_correct(index)">
-                            {{ option.isCorrect ? 'Mark incorrect' : 'Mark correct' }}
-                        </button>
-                        <button v-if="optionList.length>2" class="btn btn-outline-danger" @click="remove_option(index)">
-                            Remove
-                        </button>
-                    </div>
+            <!-- <transition-group name="custom-transition" tag="div"> -->
+            <!-- Option List -->
+            <div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
+                :class="{'border-success bg-success-subtle': option.isCorrect}">
+                <!-- Option Input -->
+                <input v-model="option.text" type="text" class="form-control mb-2" placeholder="Enter option text">
+                <div v-if="validationErrors.options[index]" class="text-danger">
+                    {{ validationErrors.options[index] }}
                 </div>
-            </transition-group>
+
+                <!-- Buttons (Stacked on Mobile) -->
+                <div class="d-flex flex-column flex-sm-row gap-2">
+                    <button class="btn btn-outline-success" @click="toggle_is_correct(index)">
+                        {{ option.isCorrect ? 'Mark incorrect' : 'Mark correct' }}
+                    </button>
+                    <button v-if="optionList.length>2" class="btn btn-outline-danger" @click="remove_option(index)">
+                        Remove
+                    </button>
+                </div>
+            </div>
+            <!-- </transition-group> -->
 
             <!-- Error for correct option selection  -->
             <div v-if="!validationErrors.valid_overall" class="text-danger mt-2">
@@ -240,7 +251,7 @@
         </div>
     </div>
 
-    <div v-if="mode === 'attempt'">
+    <div v-else-if="mode === 'attempt'">
         <!-- Question Container -->
         <div class="p-4 border-2 rounded question-container"
             :class="selectedOption !== null ? 'bg-success-subtle' : 'bg-danger-subtle'">
@@ -250,23 +261,15 @@
                 <p class="fw-bold">{{ questionTitle }}</p>
             </div>
 
-            <transition-group name="custom-transition" tag="div">
-                <!-- Option List -->
-                <div v-for="(option, index) in optionList" :key="index"
-                    class="p-3 border-1 option-container rounded mb-2"
-                    :class="{'border-primary bg-primary-subtle': selectedOption === index}">
-
-                    <!-- Selectable Options -->
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" :id="'option_' + index" :value="index"
-                            v-model="selectedOption">
-                        <label class="form-check-label" :for="'option_' + index">
-                            {{ option.text }}
-                        </label>
-                    </div>
-                </div>
-            </transition-group>
-
+            <!-- Option List -->
+            <div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
+                :class="{'border-warning bg-warning-subtle': selectedOption === index}"
+                @click="updateUserSelection(index)">
+                <!-- Selectable Options -->
+                <label class="form-check-label">
+                    {{ option.text }}
+                </label>
+            </div>
             <!-- Error Message if No Option is Selected -->
             <div v-if="selectedOption===-1" class="text-danger mt-2">
                 Please select at least one option.
@@ -275,7 +278,32 @@
         </div>
     </div>
 
-</div>
+    <div v-else-if="mode==='show'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container"
+            :class="_answerData._mark_obtained===1? 'bg-success-subtle' : 'bg-danger-subtle'">
+
+            <!-- Question Title (Read-Only) -->
+            <div class="mb-4">
+                <p class="fw-bold">{{ questionTitle }}</p>
+            </div>
+
+            <!-- Option List -->
+            <div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
+            :class="[
+                        selectedOption === _answerData.selectedOptionIndex ? 'border-warning bg-warning-subtle' : '',
+                        option.isCorrect ? 'bg-success-subtle' : 'bg-danger-subtle'
+                    ]"
+             >
+                <!-- Selectable Options -->
+                <label class="form-check-label">
+                    {{ option.text }} {{option.isCorrect?'(correct answer)':''}}
+                </label>
+            </div>
+        </div>
+
+    </div>
+    </div>
   `
             };
 
@@ -285,18 +313,22 @@
                 },
                 props: {
                 },
-                emits: ['createdQuiz'],
+                emits: ['newQuizCreated'],
                 setup(props, { emit }) {
 
+                    const reference_section = ref("");
                     const questionTypes = ref(["SCQ", "MCQ"]);
                     const defaultQtype = ref("SCQ"); // Default selection
 
                     const questions = ref({
-                        Q1: { _qtype: "SCQ", _qdata: {}, _is_valid: false } // Start with one question
+                        Q1: { _id: 'Q1', _qtype: "SCQ", _qdata: {}, _is_valid: false } // Start with one question
                     });
 
                     // Compute if all questions are valid
-                    const isValidQuiz = computed(() => Object.values(questions.value).every(q => q._is_valid));
+                    const isValidQuiz = computed(() => {
+                        return Object.values(questions.value).every(q => q._is_valid) &&
+                            reference_section.value.trim().length > 0
+                    });
 
                     // Function to find the next question key (Q1, Q2, Q3...)
                     const getNextQuestionKey = () => {
@@ -308,7 +340,12 @@
                     // Add new question
                     const addQuestion = () => {
                         const newKey = getNextQuestionKey();
-                        questions.value[newKey] = { _qtype: defaultQtype.value, _qdata: {}, _is_valid: false };
+                        questions.value[newKey] = {
+                            _id: newKey,
+                            _qtype: defaultQtype.value,
+                            _qdata: {},
+                            _is_valid: false
+                        };
                     };
 
                     // Remove a question
@@ -321,8 +358,25 @@
                         questions.value[key]._qdata = qdata;
                         questions.value[key]._is_valid = qdata._is_valid;
                     };
+                    const submitQuiz = () => {
+
+                        emit('newQuizCreated', {
+                            _qData: questions.value,
+                            _metaData: {
+                                source: reference_section.value,
+                                upload_time: new Date().toISOString()
+                            },
+                            _is_valid: isValidQuiz.value
+                        })
+                        questions.value = { Q1: { _id: 'Q1', _qtype: "SCQ", _qdata: {}, _is_valid: false } }// Start with one question
+
+                    };
+                    onMounted(() => {
+                        alert("create Quiz mounted")
+                    });
 
                     return {
+                        reference_section,
                         questionTypes,
                         defaultQtype,
                         questions,
@@ -330,22 +384,40 @@
                         addQuestion,
                         removeQuestion,
                         updateQuestion,
-                        getNextQuestionKey
+                        getNextQuestionKey,
+                        submitQuiz
                     };
                 },
 
                 template: `
-<!-- Questions List -->
-<transition-group name="custom-transition" tag="div">
-    <div v-for="(question, key) in questions" :key="key">
+<div>
 
+    <!-- get the section of S -->
+    <div class="d-flex flex-column justify-content-center align-items-center px-3">
+        <label for="sbInput" class="form-label fs-5 mb-2 text-center">Enter SB section</label>
+        <div class="w-100 w-sm-75 w-md-50 w-lg-40">
+            <input type="text" id="sbInput" class="form-control text-wrap p-2" placeholder="Enter text here..."
+                style="white-space: normal; word-wrap: break-word;" v-model="reference_section">
+        </div>
+
+        <div v-if="reference_section.trim().length==0" class="text-danger">
+            Please enter the reference SB section
+        </div>
+    </div>
+
+
+
+    <!-- Questions List -->
+    <!-- <transition-group name="custom-transition" tag="div"> -->
+    <div v-for="(question, key) in questions" :key="key">
         <hr class="my-4 border border-2 border-dark opacity-75" />
 
         <!-- Question Type Selection (Flex Row) -->
-        <div class="mb-2 d-flex align-items-center">   
-            
+        <div class="mb-2 d-flex align-items-center">
+
             <!-- Leftmost "Q1" Display in Red Circle -->
-            <div class="d-flex align-items-center justify-content-center fs-5 border border-danger rounded-circle p-2 me-3">
+            <div
+                class="d-flex align-items-center justify-content-center fs-5 border border-danger rounded-circle p-2 me-3">
                 {{key}}
             </div>
 
@@ -364,14 +436,10 @@
 
             <!-- Right-Aligned Close Button -->
 
-            <button v-if="Object.keys(questions).length > 1"
-                    type="button" 
-                    class="btn-close ms-auto fs-5 border border-danger rounded-circle p-2 shadow-sm"
-                    aria-label="Close" 
-                    @click="removeQuestion(key)">
+            <button v-if="Object.keys(questions).length > 1" type="button"
+                class="btn-close ms-auto fs-5 border border-danger rounded-circle p-2 shadow-sm" aria-label="Close"
+                @click="removeQuestion(key)">
             </button>
-
-                    
 
         </div>
 
@@ -382,21 +450,31 @@
         </div>
 
     </div>
+
     <!-- Add New Question -->
-    <div class="d-flex justify-content-center">
-        <button class="btn btn-success mt-3" @click="addQuestion"> 
+    <div class="d-flex">
+        <button class="btn btn-success mt-3" @click="addQuestion">
             ➕ Add {{getNextQuestionKey()}}
         </button>
     </div>
-</transition-group>
+    <!-- </transition-group> -->
 
-<!-- <pre><code>{{ JSON.stringify(questions, null, 2) }}</code></pre> -->
+    <!-- Submit button  -->
+    <div class="d-flex justify-content-center">
+        <button v-if="!isValidQuiz" class="btn btn-danger mt-3 flex-grow-1" disabled="true">
+            Cannot submit
+        </button>
+        <button v-else class="btn btn-success mt-3 flex-grow-1" @click="submitQuiz">
+            Submit Questions
+        </button>
+    </div>
 
-
+    <!-- <pre><code>{{ JSON.stringify(questions, null, 2) }}</code></pre> -->
+</div>
 `
-
             };
 
+            // attempt Quiz
             const attemptQuiz = {
                 components: {
                     SCQ
@@ -411,14 +489,13 @@
                         required: true,
                     },
                 },
-                emits: ['quizSubmitted'],
+                emits: ['quizAttempted'],
                 setup(props, { emit }) {
 
-                    const quizResponse = reactive({});
+                    const quizResponse = ref({});
                     // pre-fill this with quizQuestionData which will be synced from Question components
-                    props.quizQuestionData.forEach((value, key) => {
-                        quizResponse[key] = {
-                            _qtype: value._qtype,
+                    Object.keys(props.quizQuestionData).forEach((key) => {
+                        quizResponse.value[key] = {
                             _answerData: {},
                             _have_answered: false,
                             _mark_obtained: 0,
@@ -426,66 +503,169 @@
                     });
 
                     // Compute if all questions have been answered
-                    const haveAttemptedAll = computed(() => Object.values(userResponse.value).every(q._have_answered));
+                    const haveAttemptedAll = computed(() => {
+                        return Object.values(quizResponse.value).every(q => q._have_answered)
+                    });
 
                     // Update question data
                     const updateUserResponse = (key, data) => {
-                        quizResponse.value[key]._answerData = data;
+                        quizResponse.value[key]._answerData = { ...data };
                         quizResponse.value[key]._have_answered = data._have_answered;
                         quizResponse.value[key]._mark_obtained = data._mark_obtained;
                     };
 
+                    const submitAttemptQuiz = () => {
+                        alert("updated user response")
+
+                        emit('quizAttempted',
+                            {
+                                answerData: quizResponse.value,
+                                metaData: {
+                                }
+                            }
+                        )
+                    };
+                    onMounted(() => {
+                        alert("attempt Quiz mounted")
+
+                    });
+
                     return {
                         quizResponse,
                         haveAttemptedAll,
-                        updateUserResponse
+                        updateUserResponse,
+                        submitAttemptQuiz
+
                     };
                 },
 
                 template: `
-<!-- Questions List -->
-<div v-for="(question, key) in quizQuestionData" :key="key">
+<div>
+    <!-- Questions List -->
+    <div v-for="(question, key) in quizQuestionData" :key="key">
 
-    <hr class="my-4 border border-2 border-dark opacity-75" />
+        <hr class="my-4 border border-2 border-dark opacity-75" />
 
-    <!-- Question Type Selection (Flex Row) -->
-    <div class="mb-2 d-flex align-items-center">
+        <!-- Question Type Selection (Flex Row) -->
+        <div class="mb-2 d-flex align-items-center">
 
-        <!-- Leftmost "Q1" Display in Red Circle -->
-        <div class="d-flex align-items-center justify-content-center fs-5 border border-danger rounded-circle p-2 me-3">
-            {{key}} ({{question._qtype}})
+            <!-- Leftmost "Q1" Display in Red Circle -->
+            <div
+                class="d-flex align-items-center justify-content-center fs-5 border border-danger rounded-circle p-2 me-3">
+                {{key}} ({{question._qtype}})
+            </div>
         </div>
+
+        <!-- Render Question Component Based on Type -->
+        <div v-if="question._qtype==='SCQ'">
+            <SCQ :mode="'attempt'" :_questionData="question._qdata"
+                @attemptedQuestion="updateUserResponse(key,$event)" />
+        </div>
+
+        <div v-else>
+            in progress
+        </div>
+
     </div>
 
-
-    <!-- Render Question Component Based on Type -->
-    <div v-if="question._qtype==='SCQ'">
-        <SCQ :mode="'attempt'" :_questionData="question._qdata" @attemptedQuestion="updateUserResponse(key,$event)" />
+    <div class="d-flex justify-content-center">
+        <button v-if="!haveAttemptedAll" class="btn btn-danger mt-3" disabled="true">
+            Please attempt all questions
+        </button>
+        <button v-else class="btn btn-success mt-3 flex-grow-1" @click="submitAttemptQuiz">
+            Submit your Answers
+        </button>
     </div>
 
+    <!-- <pre><code>{{ JSON.stringify(quizResponse.value, null, 2) }}</code></pre> -->
 </div>
+           
+            `
 
-<pre><code>{{ JSON.stringify(quizResponse, null, 2) }}</code></pre>
-`
+            };
+
+            // Review Quiz
+            const reviewQuiz = {
+                components: {
+                    SCQ
+                },
+                props: {
+                    quizQuestionData: {
+                        type: Object,
+                        required: true
+                    },
+                    quizMetaData: {
+                        type: Object,
+                        required: true,
+                    },
+                    quizAnswerData: {
+                        type: Object,
+                        required: true
+                    }
+                },
+                emits: ["noemission"],
+                setup(props, { emit }) {
+
+                    onMounted(() => {
+                        alert("review Quiz mounted")
+
+                    });
+
+                    return {
+
+                    };
+                },
+
+                template: `
+<div>
+    <!-- Questions List -->
+    <div v-for="(question, key) in quizQuestionData" :key="key">
+
+        <hr class="my-4 border border-2 border-dark opacity-75" />
+
+        <!-- Question Type Selection (Flex Row) -->
+        <div class="mb-2 d-flex align-items-center">
+
+            <!-- Leftmost "Q1" Display in Red Circle -->
+            <div
+                class="d-flex align-items-center justify-content-center fs-5 border border-danger rounded-circle p-2 me-3">
+                {{key}} ({{question._qtype}})
+            </div>
+        </div>
+
+        <!-- Render Question Component Based on Type -->
+        <div v-if="question._qtype==='SCQ'">
+            <SCQ :mode="'show'" :_questionData="question._qdata" :_answerData="quizAnswerData[key]._answerData" />
+        </div>
+
+        <div v-else>
+            in progress
+        </div>
+
+    </div>
+
+</div>     
+            `
 
             };
 
             const app = Vue.createApp({
                 components: {
                     createQuiz,
-                    attemptQuiz
+                    attemptQuiz,
+                    reviewQuiz
                 },
                 setup() {
 
-                    const active_QuizQuestion = reactive({});
-                    const active_QuizAnswer = reactive({});
+                    const active_QuizQuestion = ref({});
+                    const active_QuizAnswer = ref({});
 
                     const updateActiveQuiz = (updatedQuizQuestion) => {
-                        active_QuizQuestion.value = updatedQuizQuestion;
+                        active_QuizQuestion.value = JSON.parse(JSON.stringify(updatedQuizQuestion));
                     };
 
                     const updateActiveRespose = (updatedQuizAnswer) => {
-                        active_QuizAnswer.value = updatedQuizAnswer;
+                        active_QuizAnswer.value = JSON.parse(JSON.stringify(updatedQuizAnswer));
                     };
 
                     return {
@@ -499,10 +679,32 @@
 
                 // main app template
                 template: `
-                <createQuiz @createdQuiz="updateActiveQuiz"
                 
-                />
+                <hr class="my-4 border border-2 border-dark opacity-75" />
+                <createQuiz @newQuizCreated="updateActiveQuiz" />
+                
                 <pre><code>{{ JSON.stringify(active_QuizQuestion, null, 2) }}</code></pre>
+                
+                <hr class="my-4 border border-2 border-dark opacity-75" />
+                
+                <div v-if="active_QuizQuestion._is_valid">
+                    <attemptQuiz 
+                    :quizQuestionData="active_QuizQuestion._qData"
+                    :quizMetaData="active_QuizQuestion._metaData"
+                    @quizAttempted="updateActiveRespose"
+                    />
+                    </div>
+                    
+                    <pre><code>{{ JSON.stringify(active_QuizAnswer, null, 2) }}</code></pre>
+                <hr class="my-4 border border-2 border-dark opacity-75" />
+
+                <reviewQuiz
+                v-if="active_QuizAnswer.answerData"
+                :quizQuestionData="active_QuizQuestion._qData"
+                :quizMetaData="active_QuizQuestion._metaData"
+                :quizAnswerData="active_QuizAnswer.answerData"
+                />
+
 
                 `
             });
