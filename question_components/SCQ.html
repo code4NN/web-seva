@@ -70,6 +70,100 @@
         .custom-transition-move {
             transition: transform 0.8s ease;
         }
+
+        /* Animation etc for the spinner */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1050;
+            backdrop-filter: blur(5px);
+            /* Soft blur effect */
+        }
+
+        /* Centered spinner */
+        .spinner-container {
+            text-align: center;
+            animation: fadeIn 0.8s ease-in-out;
+        }
+
+        /* Spinner with both spinning & zoom-in-out effect */
+        .spinner-animated {
+            width: 4rem;
+            height: 4rem;
+            border-width: 5px;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Loading text animation */
+        .loading-text {
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-top: 1rem;
+            animation: textFade 1.5s infinite ease-in-out;
+        }
+
+        /* Keyframes for spinning effect */
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Keyframes for pulsating (zoom-in/out) effect
+        @keyframes pulseSpinner {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            50% {
+                transform: scale(1.3);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+        } */
+
+        /* Keyframes for text fade effect */
+        @keyframes textFade {
+            0% {
+                opacity: 0.5;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.5;
+            }
+        }
+
+        /* Keyframes for overall fade-in effect */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
     </style>
 
 
@@ -80,6 +174,31 @@
 
         <script>
             const { ref, onMounted, watch, computed, onUnmounted } = Vue;
+
+            // Spinner
+            const Spinner = {
+                props: {
+                    is_active: {
+                        type: Boolean,
+                        required: true
+                    },
+                    display_text: {
+                        type: String,
+                        required: true
+                    }
+                },
+                setup() {
+                },
+                template: `
+<div v-if="is_active" class="overlay">
+    <div class="spinner-container">
+      <!-- Spinner with both spinning & pulsating effect -->
+      <div class="spinner-border text-light spinner-animated" role="status"></div>
+      <p class="loading-text">{{ display_text }}</p>
+    </div>
+</div>
+                `
+            };
 
             // LoginHandler
             const LoginHandler = {
@@ -182,7 +301,7 @@
     <div v-if="showDetails" class="position-fixed top-0 start-50 translate-middle-x mt-4 w-75 w-md-50 p-4 bg-light border rounded shadow-lg" style="z-index: 1050;">
         <div class="position-relative">
             <!-- Toggle Edit mode (adjusted position) -->
-            <button class="btn btn-primary mt-4" @click="toggle_quiz_creation_mode">
+            <button class="btn btn-primary mt-4 mb-4" @click="toggle_quiz_creation_mode">
                 {{is_edit_mode?'quit Quiz Creation mode': 'Lets Create Quiz'}}
                 </button>
             <!-- Close Button (adjusted position) -->
@@ -280,11 +399,14 @@
                 template: `
 <div>
     <div class="d-flex align-items-center border rounded p-2">
+        
         <!-- Scrollable Date List -->
-        <div class="d-flex overflow-auto flex-grow-1">
+        <div class="d-flex overflow-auto flex-grow-1"
+            style="scrollbar-width: none; -ms-overflow-style: none;">
+            
             <button v-for="(date, index) in dateList" 
             :key="index"
-            class="btn btn-outline-primary me-2"
+            class="btn btn-outline-primary me-2 text-nowrap"
             :class="{'btn-primary text-white': activeDate === date}"
             @click="handleDateClicked(date)">
                 {{ date }}
@@ -950,7 +1072,8 @@
                     DateSelector,
                     createQuiz,
                     attemptQuiz,
-                    reviewQuiz
+                    reviewQuiz,
+                    Spinner
                 },
                 setup() {
 
@@ -958,6 +1081,10 @@
                     const active_QuizAnswer = ref({});
                     const activeDate = ref('');
                     const userInfo = ref({});
+                    const spinnerStatus = ref({
+                        showing: false,
+                        text: "Just checking it out"
+                    });
 
                     const is_creating_quiz = ref(false);
                     const active_mode = ref('attempt_show');
@@ -987,6 +1114,7 @@
                     };
 
                     return {
+                        spinnerStatus,
                         userInfo,
                         activeDate,
                         active_QuizQuestion,
@@ -1004,6 +1132,7 @@
 
                 // main app template
                 template: `
+<Spinner :is_active="spinnerStatus.showing" :display_text="spinnerStatus.text" />
 <LoginHandler :is_edit_mode="is_creating_quiz"
     :allow_overlay="active_mode!=='attempt_active'"
     @update_user_creds="updateUserInfo"
@@ -1014,16 +1143,19 @@
 
     <div class="mt-4">
         <!-- Choose the date -->
-        <DateSelector v-show="active_mode!='attempt_active'" :dateList="['Jan-5-mon','Jan-6-Tue']" :activeDate="activeDate" :showNewPicker="is_creating_quiz"
+        <DateSelector v-show="active_mode!='attempt_active'"
+            :dateList="['Jan-5-mon','Jan-6-Tue','Jan-5-mon','Jan-6-Tue','Jan-5-mon','Jan-6-Tue','Jan-5-mon','Jan-6-Tue',]" 
+            :activeDate="activeDate" 
+            :showNewPicker="is_creating_quiz"
             @dateClicked="updateActiveDate" />
 
 
         <!-- for changing various modes -->
-        <div v-show="active_mode!='attempt_active'" class="d-flex overflow-auto flex-grow-1 mt-2">
+        <div v-if="!(active_mode === 'attempt_active' || is_creating_quiz)" class="d-flex overflow-auto flex-grow-1 mt-2">
             
             <!-- for leaderboard -->
             <div>
-                <button v-show="active_mode!='attempt_active'"
+                <button
                     class="btn btn-outline-primary me-2" 
                     :class="{'btn-primary text-white': active_mode === 'db_daily'}"
                     @click="active_mode='db_daily'"> Dashboard </button>
@@ -1038,7 +1170,7 @@
 
             <!-- otherwise show the preview-of attempt-->
             <div  v-else>
-                <button v-show="active_mode!='attempt_active'" class="btn btn-outline-primary me-2"
+                <button  class="btn btn-outline-primary me-2"
                 :class="{'btn-primary text-white': active_mode === 'attempt_show'}"
                     @click="active_mode='attempt_show'"> Attempt Now </button>
             </div>
