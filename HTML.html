@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vue 3 Flatpickr Example</title>
+
+  <!-- Include Flatpickr CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.2.41/dist/vue.global.prod.js"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.9"></script>
+
+
+</head>
+<body>
+
+  <div id="app"></div>
+
+  <script>
+    const { createApp, ref, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const selectedDate = ref(null);
+        const dateInputRef = ref(null);
+
+        const openDatePicker = () => {
+          flatpickr(dateInputRef.value, {
+            onChange: (selectedDates) => {
+              selectedDate.value = selectedDates[0];
+            },
+          }).open();  // Open the date picker
+        };
+
+        return {
+          selectedDate,
+          openDatePicker,
+          dateInputRef,
+        };
+      },
+      template: `
+        <div>
+          <!-- Button to trigger date picker -->
+          <button @click="openDatePicker">Open Date Picker</button>
+
+          <!-- Hidden input element to attach Flatpickr -->
+          <div ref="dateInputRef" style="display:none;" class="hidden"/>
+          <!--<input ref="dateInputRef" type="text" style="display: none;" />-->
+
+          <!-- Display selected date -->
+          <p v-if="selectedDate">Selected Date: {{ selectedDate }}</p>
+        </div>
+      `,
+    }).mount("#app");
+  </script>
+
+</body>
+</html>

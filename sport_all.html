@@ -48,6 +48,13 @@
             /* Light blue shadow */
         }
 
+        .date-input {
+            position: absolute;
+            opacity: 0;
+            width: 1px;
+            height: 1px;
+        }
+
 
 
         /* this section covers about element/s addition or deletion */
@@ -414,10 +421,10 @@
         </div>
 
         <!-- Date Picker Button (Right-Aligned) -->
-        <button v-if="showNewPicker" class="btn btn-secondary ms-2" @click="triggerDatePicker">
+        <!--<button v-if="showNewPicker" class="btn btn-secondary ms-2" @click="triggerDatePicker">
             📅 new
-            <input type="date" ref="calendar_date" class="d-none" @change="updateDate_from_calendar">
-        </button>
+            </button>-->
+        <input type="date" ref="calendar_date" @change="updateDate_from_calendar">
 
     </div>
 
