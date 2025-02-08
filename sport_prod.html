@@ -212,13 +212,13 @@
                         required: true
                     }
                 },
-                emits: ['update_user_creds', 'create_quiz','spin'],
+                emits: ['update_user_creds', 'create_quiz', 'spin'],
                 setup(props, { emit }) {
                     const username = ref('');
                     const password = ref('');
                     const showPassword = ref(false);
                     const loginError = ref({
-                      haserror:false,msg:''
+                        haserror: false, msg: ''
                     })
 
                     const showDetails = ref(false);
@@ -246,42 +246,42 @@
 
                     const handleSubmit = () => {
                         // user validation here
-                        emit('spin',{showing:true,text:'loggin in'})
+                        emit('spin', { showing: true, text: 'loggin in' })
 
-                        google.script.run.withSuccessHandler((response)=>{
-                          if(response.status==='success'){
-                            // clear the password etc
-                            username.value = '';
-                            password.value = '';
-                            loginError.value = {haserror:false,msg:''}
+                        google.script.run.withSuccessHandler((response) => {
+                            if (response.status === 'success') {
+                                // clear the password etc
+                                username.value = '';
+                                password.value = '';
+                                loginError.value = { haserror: false, msg: '' }
 
-                            // successfully logged in
-                            const user_credential = response.creds;
-                            
-                            // Store the credentials
-                            localStorage.setItem('creds', JSON.stringify(user_credential));
-                            console.log(user_credential);
-                            userCreds.value = user_credential;
+                                // successfully logged in
+                                const user_credential = response.creds;
 
-                            emit('spin',{showing:false,text:''})
-                          }
-                          else if (response.status=='failed'){
-                            // incorrect password
-                            password.value = '';
-                            loginError.value = {haserror:true,msg:'incorrect password'}
+                                // Store the credentials
+                                localStorage.setItem('creds', JSON.stringify(user_credential));
+                                console.log(user_credential);
+                                userCreds.value = user_credential;
 
-                            emit('spin',{showing:false,text:''})
-                          }
-                          else if (response.status==='nouser'){
-                            // user does not exist
-                            emit('spin',{showing:false,text:''})
+                                emit('spin', { showing: false, text: '' })
+                            }
+                            else if (response.status == 'failed') {
+                                // incorrect password
+                                password.value = '';
+                                loginError.value = { haserror: true, msg: 'incorrect password' }
 
-                            username.value = '';
-                            password.value = '';
-                            loginError.value = {haserror:true,msg:'user does not exist'}
-                          }
+                                emit('spin', { showing: false, text: '' })
+                            }
+                            else if (response.status === 'nouser') {
+                                // user does not exist
+                                emit('spin', { showing: false, text: '' })
+
+                                username.value = '';
+                                password.value = '';
+                                loginError.value = { haserror: true, msg: 'user does not exist' }
+                            }
                         }).login_validateUserLogin(username.value, password.value);
-                        
+
 
                     };
 
@@ -416,7 +416,38 @@
 
                     const updateDate_from_calendar = (event) => {
                         const new_date_value = event.target.value;
-                        emit('dateClicked', new_date_value);
+
+                        // format the date in the id-format
+                        const formatDateAsID = (dateString) => {
+                            const now = new Date();
+                            const currentHours = String(now.getHours()).padStart(2, "0");
+                            const currentMinutes = String(now.getMinutes()).padStart(2, "0");
+                            const currentSeconds = String(now.getSeconds()).padStart(2, "0");
+
+                            // Append the time to the date string
+                            const dateTimeString = `${dateString}T${currentHours}:${currentMinutes}:${currentSeconds}`;
+                            const date = new Date(dateTimeString);
+
+                            const day = date.getDate();
+                            const year = date.getFullYear();
+                            const month = (date.getMonth() + 1).toString().padStart(2, "0");
+
+                            const monthName = date.toLocaleString('default', { month: 'short' });
+                            const dayName = date.toLocaleString('default', { weekday: 'short' });
+
+                            const timestamp = date.getTime();
+                            // Convert milliseconds to seconds (for sorting purposes)
+                            const secondsElapsed = Math.floor(timestamp / 1000);
+
+                            return `${secondsElapsed}|${year}-${month}-${day}|${monthName} ${day}, ${dayName}`
+                        }
+                        console.log(`${new_date_value}-${formatDateAsID(new_date_value)}`)
+                        if (new_date_value) {
+                            emit('dateClicked', formatDateAsID(new_date_value));
+                        }
+                        else {
+                            emit('dateClicked', '');
+                        }
                     };
 
                     return {
@@ -439,7 +470,7 @@
             class="btn btn-outline-primary me-2 text-nowrap"
             :class="{'btn-primary text-white': activeDate === date}"
             @click="handleDateClicked(date)">
-                {{ date }}
+                {{ date.split('|')[2] }}
             </button>
         </div>
     </div>
@@ -495,7 +526,11 @@
                         { text: '', isCorrect: false },
                         { text: '', isCorrect: false }
                     ]);
-
+                    console.log(props.std_questionData)
+                    if (Object.keys(props.std_questionData).length > 0) {
+                        questionTitle.value = props.std_questionData.title;
+                        optionList.value = props.std_questionData.optionList;
+                    }
 
                     const validationErrors = computed(() => {
 
@@ -550,12 +585,6 @@
                     };
 
                     // -----------------for attempt mode
-                    if (props.std_mode !== 'edit') {
-                        // update the questionTitle and options
-                        // for attempt and show mode
-                        questionTitle.value = props.std_questionData.title;
-                        optionList.value = props.std_questionData.optionList;
-                    }
                     const selectedOption = ref(-1);
                     const updateUserSelection = (answerIndex) => {
                         selectedOption.value = answerIndex;
@@ -722,13 +751,11 @@
                     // this is for editQuestion, attemptQuiz, reviewQuiz
                     std_questionData: {
                         type: Object,
-                        default: {}
                     },
 
                     // this is for reviewQuiz
                     std_answerData: {
                         type: Object,
-                        default: {}
                     }
                 },
                 emits: ['createdQuestion', 'attemptedQuestion'],
@@ -774,22 +801,41 @@
                     Qwrapper
                 },
                 props: {
+                    quizDraftData: {
+                        type: Object,
+                        required: true
+                    }
                 },
                 emits: ['newQuizCreated'],
                 setup(props, { emit }) {
 
-                    const reference_section = ref("");
+                    const metadata_about_quiz = ref(
+                        {
+                            reference_section: "",
+                            is_active: false,
+                        }
+                    );
                     const questionTypes = ref(["SCQ", "MCQ"]);
                     const defaultQtype = ref("SCQ"); // Default selection
 
-                    const questions = ref({
-                        Q1: { _id: 'Q1', _qtype: "SCQ", _qdata: {}, _is_valid: false } // Start with one question
-                    });
+                    const questions = ref({});
+                    if (Object.keys(props.quizDraftData).length > 0) {
+                        questions.value = props.quizDraftData._qData
+                    }
+                    else {
+                        questions.value['Q1'] = {
+                            _id: 'Q1',
+                            _qtype: "SCQ",
+                            _qdata: {}, _is_valid: false
+                        } // Start with one question
+
+                    }
 
                     // Compute if all questions are valid
                     const isValidQuiz = computed(() => {
-                        return Object.values(questions.value).every(q => q._is_valid) &&
-                            reference_section.value.trim().length > 0
+                        const metada_is_valid = metadata_about_quiz.value.reference_section.trim().length > 0;
+
+                        return Object.values(questions.value).every(q => q._is_valid) && metada_is_valid
                     });
 
                     // Function to find the next question key (Q1, Q2, Q3...)
@@ -825,8 +871,7 @@
                         emit('newQuizCreated', {
                             _qData: questions.value,
                             _metaData: {
-                                source: reference_section.value,
-                                upload_time: new Date().toISOString()
+                                ...metadata_about_quiz.value
                             },
                             _is_valid: isValidQuiz.value
                         })
@@ -838,7 +883,7 @@
                     });
 
                     return {
-                        reference_section,
+                        metadata_about_quiz,
                         questionTypes,
                         defaultQtype,
                         questions,
@@ -856,15 +901,17 @@
 
     <!-- get the source reference (title) of the quiz -->
     <div class="d-flex flex-column justify-content-center align-items-center px-3">
+
+        <!-- get the quiz source section name -->
         <label for="sbInput" class="form-label fs-5 mb-2 text-center">Enter SB section</label>
         <div class="w-100 w-sm-75 w-md-50 w-lg-40">
             <input type="text" id="sbInput" class="form-control text-wrap p-2" placeholder="Enter text here..."
-                style="white-space: normal; word-wrap: break-word;" v-model="reference_section">
+                style="white-space: normal; word-wrap: break-word;" v-model="metadata_about_quiz.reference_section">
         </div>
-
-        <div v-if="reference_section.trim().length==0" class="text-danger">
+        <div v-if="metadata_about_quiz.reference_section.trim().length==0" class="text-danger">
             Please enter the reference SB section
         </div>
+
     </div>
 
 
@@ -872,7 +919,7 @@
     <!-- Questions List -->
     <transition-group name="custom-transition" tag="div">
         <div v-for="(question, key) in questions" :key="key">
-            <hr class="my-4 border border-2 border-dark opacity-75" />
+            <hr class="my-4 border border-1 border-dark opacity-75" />
 
             <!-- Question Type Selection (Flex Row) -->
             <div class="mb-2 d-flex align-items-center">
@@ -906,8 +953,9 @@
 
 
             <!-- Render Question Component-->
+            {{quizDraftData._qData[key]}}
             <Qwrapper :std_qtype="question._qtype" :std_mode="'edit'" :std_questionCreationKey="key"
-                @createdQuestion="updateQuestion(key,$event)" />
+                :std_questionData="quizDraftData._qData[key]._qdata" @createdQuestion="updateQuestion(key,$event)" />
 
         </div>
 
@@ -918,13 +966,25 @@
             </button>
         </div>
     </transition-group>
+    <hr class="my-4 border border-1 border-dark opacity-75" />
 
     <!-- Submit button  -->
-    <div class="d-flex justify-content-center">
-        <button v-if="!isValidQuiz" class="btn btn-danger mt-3 flex-grow-1" disabled="true">
+    <div class="d-flex flex-column align-items-center ">
+
+         <button 
+            class="mt-3 align-self-start"
+            :class="metadata_about_quiz.is_active ? 'btn btn-success' : 'btn btn-danger'"
+            @click="metadata_about_quiz.is_active=!metadata_about_quiz.is_active"
+        >
+            {{ metadata_about_quiz.is_active ? "Save and launch (click to change)" : "Saving as draft (click to change)" }}
+        </button>
+
+
+        <button v-if="!isValidQuiz"
+        class="btn btn-danger mt-3 flex-grow-1 w-auto" disabled="true">
             Cannot submit
         </button>
-        <button v-else class="btn btn-success mt-3 flex-grow-1" @click="submitQuiz">
+        <button v-else class="btn btn-success mt-3 flex-grow-1 w-auto" @click="submitQuiz">
             Submit Questions
         </button>
     </div>
@@ -1114,9 +1174,31 @@
                 },
                 setup() {
 
-                    const active_QuizQuestion = ref({});
-                    const active_QuizAnswer = ref({});
+                    const qnaDB = ref({});
                     const activeDate = ref('');
+
+                    const active_QuizQuestion = computed(() => {
+                        if (Object.hasOwn(qnaDB.value, activeDate.value)) {
+                            return qnaDB.value[activeDate.value].question_data
+                        }
+                        else {
+                            return {}
+                        }
+                    })
+                    const active_QuizAnswer = computed(() => {
+                        if (Object.hasOwn(qnaDB.value, activeDate.value)) {
+                            return qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value]
+                        }
+
+                    });
+
+                    const active_DateList = computed(() => {
+                        return sortedDates = Object.keys(qnaDB.value).sort((a, b) => {
+                            const numA = parseInt(a.split('|')[0], 10);
+                            const numB = parseInt(b.split('|')[0], 10);
+                            return numA - numB;  // Ascending order
+                        });
+                    })
                     const userInfo = ref({});
                     const spinnerStatus = ref({
                         showing: false,
@@ -1145,22 +1227,55 @@
                     }
 
                     const updateActiveQuiz = (updatedQuizQuestion) => {
-                        active_QuizQuestion.value = JSON.parse(JSON.stringify(updatedQuizQuestion));
+                        const newly_created_quiz = JSON.parse(JSON.stringify(updatedQuizQuestion));
+                        newly_created_quiz._metaData = {
+                            ...newly_created_quiz._metaData,
+                            upload_time: new Date().toISOString(),
+                            creator: userInfo.value
+                        }
+
+
+                        // now submit the quiz
+                        spinnerStatus.value = {
+                            showing: true,
+                            text: "submitting the quiz"
+                        };
+                        // alert("submitted")
+                        google.script.run.withSuccessHandler((response) => {
+                            if (response.status === 'success') {
+                                activeDate.value = null;
+                                // reload the data
+                                spinnerStatus.value = {
+                                    showing: false,
+                                    text: ""
+                                };
+                                alert("successfully submitted")
+                            }
+                            else if (response.status == 'failed') {
+                                // some error  
+                                spinnerStatus.value = {
+                                    showing: false,
+                                    text: ""
+                                };
+                            }
+                        }).qna_upload_question(activeDate.value, JSON.stringify(newly_created_quiz));
+
+
                     };
 
                     const updateActiveRespose = (updatedQuizAnswer) => {
                         active_QuizAnswer.value = JSON.parse(JSON.stringify(updatedQuizAnswer));
                     };
 
-                    const updateSpin = (new_spin_status)=>{
-                      spinnerStatus.value = new_spin_status;
+                    const updateSpin = (new_spin_status) => {
+                        spinnerStatus.value = new_spin_status;
                     };
 
                     onMounted(() => {
 
                         // simulated that user have logged in
-                        localStorage.setItem('creds',`{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"Shivendra Pr","addr":"D3"},"db_col":{"value":6,"addr":"E3"},"role":{"value":"user, admin","addr":"F3"},"email":{"value":"data4shivendra@gmail.com","addr":"G3"},"phone":{"value":7260869161,"addr":"H3"}}`)
-                        
+                        localStorage.setItem('creds', `{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"Shivendra Pr","addr":"D3"},"db_col":{"value":6,"addr":"E3"},"role":{"value":"user, admin","addr":"F3"},"email":{"value":"data4shivendra@gmail.com","addr":"G3"},"phone":{"value":7260869161,"addr":"H3"}}`)
+                        qnaDB.value = JSON.parse(`{"status":"success","fulldb":{"1739011813|2025-02-8|Feb 8, Sat":{"question_data":{"_qData":{"Q1":{"_id":"Q1","_qtype":"SCQ","_qdata":{"_is_valid":true,"title":"which is not a proof of soul exists?","optionList":[{"text":"darwing's theory","isCorrect":true},{"text":"OBE","isCorrect":false},{"text":"reincarnation","isCorrect":false}]},"_is_valid":true},"Q2":{"_id":"Q2","_qtype":"SCQ","_qdata":{"_is_valid":true,"title":"will you attend further sessions?","optionList":[{"text":"yes","isCorrect":true},{"text":"no","isCorrect":false}]},"_is_valid":true}},"_metaData":{"reference_section":"dys 1 questions","is_active":false,"upload_time":"2025-02-08T10:51:55.764Z","creator":{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"Shivendra Pr","addr":"D3"},"db_col":{"value":6,"addr":"E3"},"role":{"value":"user, admin","addr":"F3"},"email":{"value":"data4shivendra@gmail.com","addr":"G3"},"phone":{"value":7260869161,"addr":"H3"}}},"_is_valid":true},"edit_row":2,"answer_by_user":{"shiven":{"status":"pending"},"parth":{"status":"pending"}}},"1738926065|2025-02-7|Feb 7, Fri":{"question_data":{"_qData":{"Q1":{"_id":"Q1","_qtype":"SCQ","_qdata":{"_is_valid":true,"title":"how is it going?","optionList":[{"text":"not good","isCorrect":false},{"text":"good","isCorrect":true}]},"_is_valid":true}},"_metaData":{"reference_section":"for testing purpose","is_active":false,"upload_time":"2025-02-08T11:01:31.547Z","creator":{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"Shivendra Pr","addr":"D3"},"db_col":{"value":6,"addr":"E3"},"role":{"value":"user, admin","addr":"F3"},"email":{"value":"data4shivendra@gmail.com","addr":"G3"},"phone":{"value":7260869161,"addr":"H3"}}},"_is_valid":true},"edit_row":4,"answer_by_user":{"shiven":{"status":"pending"},"parth":{"status":"pending"}}}}}`).fulldb
                         // nextTick(()=>{
                         //   pop_closer_intervalID.value = setInterval(()=>{
                         //     const closeButton = document.querySelector('.warning-banner-close-icon');
@@ -1184,6 +1299,7 @@
                         spinnerStatus,
                         userInfo,
                         activeDate,
+                        active_DateList,
                         active_QuizQuestion,
                         active_QuizAnswer,
                         is_creating_quiz,
@@ -1213,74 +1329,81 @@
     <div class="mt-4">
         <!-- Choose the date -->
         <DateSelector v-show="active_mode!='attempt_active'"
-            :dateList="['Jan-5-mon','Jan-6-Tue','Jan-5-mon','Jan-6-Tue','Jan-5-mon','Jan-6-Tue','Jan-5-mon','Jan-6-Tue',]" 
-            :activeDate="activeDate" 
+            :dateList="active_DateList" 
+            :activeDate="activeDate"
             :showNewPicker="is_creating_quiz"
             @dateClicked="updateActiveDate" />
 
+        <div v-if="activeDate">
+            <!-- for changing various modes -->
 
-        <!-- for changing various modes -->
-        <div v-if="!(active_mode === 'attempt_active' || is_creating_quiz)" class="d-flex overflow-auto flex-grow-1 mt-2">
-            
-            <!-- for leaderboard -->
-            <div>
-                <button
-                    class="btn btn-outline-primary me-2" 
-                    :class="{'btn-primary text-white': active_mode === 'db_daily'}"
-                    @click="active_mode='db_daily'"> Dashboard </button>
+            <div v-if="!(active_mode === 'attempt_active' || is_creating_quiz)" class="d-flex overflow-auto flex-grow-1 mt-2">
+                
+                <!-- for leaderboard -->
+                <div>
+                    <button
+                        class="btn btn-outline-primary me-2" 
+                        :class="{'btn-primary text-white': active_mode === 'db_daily'}"
+                        @click="active_mode='db_daily'"> Dashboard </button>
+                </div>
+                
+                <!-- if already answered then show their answer -->
+                <div v-if="false">
+                    <button class="btn btn-outline-primary me-2" 
+                    :class="{'btn-primary text-white': active_mode === 'show'}"
+                    @click="active_mode='show'"> Show Your Answer </button>
+                </div>
+
+                <!-- otherwise show the preview-of attempt-->
+                <div  v-else>
+                    <button  class="btn btn-outline-primary me-2"
+                    :class="{'btn-primary text-white': active_mode === 'attempt_show'}"
+                        @click="active_mode='attempt_show'"> Attempt Now </button>
+                </div>
+
             </div>
-            
-            <!-- if already answered then show their answer -->
-            <div v-if="false">
-                <button class="btn btn-outline-primary me-2" 
-                :class="{'btn-primary text-white': active_mode === 'show'}"
-                @click="active_mode='show'"> Show Your Answer </button>
+
+            <hr class="my-4 border border-2 border-dark opacity-75" />
+
+            <!-- if user is creating quiz -->
+            <div v-if="is_creating_quiz">
+                {{active_QuizQuestion}}
+                <createQuiz :quizDraftData="active_QuizQuestion" @newQuizCreated="updateActiveQuiz" />
+                <!-- <pre><code>{{ JSON.stringify(active_QuizQuestion, null, 2) }}</code></pre> -->
             </div>
 
-            <!-- otherwise show the preview-of attempt-->
-            <div  v-else>
-                <button  class="btn btn-outline-primary me-2"
-                :class="{'btn-primary text-white': active_mode === 'attempt_show'}"
-                    @click="active_mode='attempt_show'"> Attempt Now </button>
+
+            <!-- if user is previewing an active quiz -->
+            <div v-else-if="active_mode==='attempt_show'">
+                <button class="btn btn-primary"
+                @click="active_mode='attempt_active'">Attempt now </button>
             </div>
 
+
+            <!-- if user is actually attempting quiz -->
+            <div v-else-if="active_mode==='attempt_active'">
+
+                <!-- <attemptQuiz :quizQuestionData="active_QuizQuestion._qData" :quizMetaData="active_QuizQuestion._metaData"
+                    @quizAttempted="updateActiveRespose" />
+                 <pre><code>{{ JSON.stringify(active_QuizAnswer, null, 2) }}</code></pre> -->
+
+            </div>
+
+            <!-- Viewing the quiz results -->
+            <div v-else-if="active_mode==='show'">
+
+                <reviewQuiz v-if="active_QuizAnswer.answerData" :quizQuestionData="active_QuizQuestion._qData"
+                    :quizMetaData="active_QuizQuestion._metaData" :quizAnswerData="active_QuizAnswer.answerData" />
+            </div>
+
+            <!-- Leaderboard -->
+            <div v-else-if="active_mode==='db_daily'">
+
+            </div>
         </div>
 
-        <hr class="my-4 border border-2 border-dark opacity-75" />
-
-        <!-- if user is creating quiz -->
-        <div v-if="is_creating_quiz">
-            <createQuiz @newQuizCreated="updateActiveQuiz" />
-            <pre><code>{{ JSON.stringify(active_QuizQuestion, null, 2) }}</code></pre>
-        </div>
-
-
-        <!-- if user is previewing an active quiz -->
-        <div v-else-if="active_mode==='attempt_show'">
-            <button class="btn btn-primary"
-            @click="active_mode='attempt_active'">Attempt now </button>
-        </div>
-
-
-        <!-- if user is actually attempting quiz -->
-        <div v-else-if="active_mode==='attempt_active'">
-
-            <!-- <attemptQuiz :quizQuestionData="active_QuizQuestion._qData" :quizMetaData="active_QuizQuestion._metaData"
-                @quizAttempted="updateActiveRespose" />
-            <pre><code>{{ JSON.stringify(active_QuizAnswer, null, 2) }}</code></pre> -->
-
-        </div>
-
-        <!-- Viewing the quiz results -->
-        <div v-else-if="active_mode==='show'">
-
-            <reviewQuiz v-if="active_QuizAnswer.answerData" :quizQuestionData="active_QuizQuestion._qData"
-                :quizMetaData="active_QuizQuestion._metaData" :quizAnswerData="active_QuizAnswer.answerData" />
-        </div>
-
-        <!-- Leaderboard -->
-        <div v-else-if="active_mode==='db_daily'">
-
+        <div v-else>
+            <h3 class="mt-2 text-center text-danger"> Please Select a date first </h3>
         </div>
 
 
