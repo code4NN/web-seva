@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>SPORT</title>
     <script src="https://unpkg.com/vue@3"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -164,6 +164,22 @@
                 opacity: 1;
             }
         }
+
+        /* Prevent zooming on mobile input fields */
+        input,
+        textarea,
+        select {
+            font-size: 16px !important;
+            /* Ensures browsers don't zoom on focus */
+        }
+
+        /* Ensure proper responsiveness */
+        html,
+        body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
     </style>
 
 
@@ -210,6 +226,10 @@
                     allow_overlay: {
                         type: Boolean,
                         required: true
+                    },
+                    allowed_quiz_creation: {
+                        type: Boolean,
+                        required: true
                     }
                 },
                 emits: ['update_user_creds', 'create_quiz', 'spin'],
@@ -240,6 +260,7 @@
                             showDetails.value = !showDetails.value;
                         }
                     }
+
                     const allowSubmit = computed(() => {
                         return username.value.trim().length > 0 && password.value.trim().length > 0
                     });
@@ -247,8 +268,10 @@
                     const handleSubmit = () => {
                         // user validation here
                         emit('spin', { showing: true, text: 'loggin in' })
+                        // alert(`${username.value}, ${password.value}`)
 
                         google.script.run.withSuccessHandler((response) => {
+                            // console.log(response.status)
                             if (response.status === 'success') {
                                 // clear the password etc
                                 username.value = '';
@@ -279,6 +302,14 @@
                                 password.value = '';
                                 loginError.value = { haserror: true, msg: 'user does not exist' }
                             }
+                            else if (response.status === 'pending') {
+                                // user does not exist
+                                emit('spin', { showing: false, text: '' })
+
+                                username.value = '';
+                                password.value = '';
+                                loginError.value = { haserror: true, msg: 'your registration is in progress' }
+                            }
                         }).login_validateUserLogin(username.value, password.value);
 
 
@@ -290,6 +321,159 @@
                         showDetails.value = false;
 
                     };
+                    // ------------------------------------------------
+                    // -------------related to registration
+                    const existing_users = ref({});
+                    const db4_pending_users = ref({});
+                    const reg_verification = ref({
+                        expandeduser: {},
+                        display_name: {}
+                    })
+
+                    const regforminput = ref({
+                        open_reg_form: false,
+                        username: '',
+                        password: '',
+                        show_password: false,
+                        phone: '',
+                        email: '',
+                        showPopUp: false,
+                        popupmsg: '',
+                        admin_no: ''
+                    });
+                    const regformerrors = computed(() => {
+                        const errors = {};
+
+                        // **Username Validation**
+                        const username = regforminput.value.username;
+                        const usernameRegex = /^[a-zA-Z0-9]+$/; // Only letters and numbers
+                        if (!username) errors.username = "Username cannot be empty.";
+                        else if (username.length < 5) errors.username = "Username must be at least 5 characters.";
+                        else if (!usernameRegex.test(username)) errors.username = "Username can only contain letters and numbers.";
+                        else if (existing_users.value.username_list.includes(username)) errors.username = "Username already taken.";
+
+                        // **Password Validation**
+                        const password = regforminput.value.password;
+                        if (!password) errors.password = "Password cannot be empty.";
+                        else if (password.length < 4) errors.password = "Password must be at least 4 characters.";
+                        else if (/\s/.test(password)) errors.password = "Password cannot contain spaces.";
+
+                        // **Phone Validation**
+                        const phone = regforminput.value.phone;
+                        if (!phone) errors.phone = "Phone number cannot be empty.";
+                        else if (!/^[1-9][0-9]{9}$/.test(phone)) errors.phone = "Phone number must be exactly 10 digits and cannot start with 0.";
+                        else if (existing_users.value.phone_number_list.includes(phone)) errors.phone = "Phone number already taken.";
+
+                        // **Email Validation**
+                        const email = regforminput.value.email;
+                        if (!email) errors.email = "Email cannot be empty.";
+                        else if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email)) errors.email = "Enter a valid Gmail address.";
+
+                        // **Overall Registration Validity**
+                        return {
+                            ...errors,
+                            allow_register: Object.keys(errors).length === 0 // true if no errors
+                        };
+
+                    })
+
+                    const registerme = (regform) => {
+
+                        emit('spin', { showing: true, text: 'onboarding!!' })
+                        const payload = {
+                            username: regforminput.value.username,
+                            password: regforminput.value.password,
+                            display_name: 'pending',
+                            email: regforminput.value.email,
+                            phone: regforminput.value.phone
+                        }
+                        google.script.run.withSuccessHandler((respose) => {
+                            const status = respose.status
+                            if (status === 'missing') {
+                                alert('missing data')
+                            }
+                            else if (status === 'success') {
+                                regforminput.value.showPopUp = true;
+                                regforminput.value.popupmsg = 'You have been registered! You will receive an email/WhatsApp after verification.';
+                                emit('spin', { showing: false, text: '' })
+
+                                // clear the form
+                                regforminput.value.username = ''
+                                regforminput.value.password = ''
+                                regforminput.value.phone = ''
+                                regforminput.value.email = ''
+                                alert("Success!! You will receive a confirmation on email/whatsapp")
+                            }
+                            else if (status === 'failed') {
+                                alert('failed to register')
+                                emit('spin', { showing: false, text: '' })
+                                alert("unexpected error occurred!! :(")
+                            }
+
+                        }).login_new_registration(payload)
+
+                    };
+
+                    const verifyUser = (username) => {
+                        const userdata = db4_pending_users.value[username];
+                        const display_name = reg_verification.value.display_name[username];
+                        emit('spin', { showing: true, text: `Verifying ${display_name}` })
+                        // alert(`${username}, ${display_name} ${userdata.display_name.addr}`)
+
+                        // update the user-name
+                        google.script.run.withSuccessHandler((response) => {
+                            if (response.status === 'success') {
+                                // remove the user from pending list
+                                setTimeout(() => {
+                                    fetch_pending_user_data();
+                                }, 1000);
+
+
+                            }
+                            else if (response.status === 'failed') {
+                                emit('spin', { showing: false, text: '' })
+                                alert("unexpected error occurred!! :(")
+                            }
+                        }).login_modifyUserCreds(username, userdata.display_name.addr, display_name)
+                    }
+
+                    const fetch_existing_userdata = () => {
+                        if (Object.keys(existing_users.value).length === 0) {
+                            // fetch only if not fetched so far
+                            emit('spin', { showing: true, text: 'fetching registration form!!' })
+                            google.script.run.withSuccessHandler((response) => {
+                                existing_users.value = Object.values(response.data).reduce((acc, user) => {
+                                    acc.username_list.push(user.username.value);
+                                    acc.phone_number_list.push(user.phone.value);
+                                    acc.email_list.push(user.email.value);
+                                    return acc;
+                                }, { username_list: [], phone_number_list: [], email_list: [] });
+
+                                regforminput.value.admin_no = Object.values(response.data)
+                                    .filter(item => {
+                                        item.role.value.includes('admin,')
+                                    })
+
+                                emit('spin', { showing: false, text: '' })
+
+                            }).login_get_all_users(false)
+                        }
+
+                    };
+
+                    const fetch_pending_user_data = () => {
+                        emit('spin', { showing: true, text: 'fetching pending users' })
+                        google.script.run.withSuccessHandler((response) => {
+                            db4_pending_users.value = response.data;
+                            Object.entries(db4_pending_users.value).forEach(([username, userdata]) => {
+                                reg_verification.value.expandeduser[username] = false;
+                                reg_verification.value.display_name[username] = '';
+                            });
+                            emit('spin', { showing: false, text: '' })
+
+                        }).login_get_all_users(true)
+                    }
+
 
                     onMounted(() => {
                         const existingcredsraw = localStorage.getItem("creds")
@@ -300,12 +484,42 @@
                         else {
                             // alert("user not found")
                         }
+                        // pre-fill existing user
+                        // const existing_user_full = JSON.parse(`{"shiven":{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"Shivendra Pr","addr":"D3"},"db_col":{"value":6,"addr":"E3"},"role":{"value":"user, admin","addr":"F3"},"email":{"value":"data4shivendra@gmail.com","addr":"G3"},"phone":{"value":7260869161,"addr":"H3"}},"parth":{"username":{"value":"parth","addr":"B4"},"password":{"value":"198","addr":"C4"},"display_name":{"value":"Parth Pr","addr":"D4"},"db_col":{"value":7,"addr":"E4"},"role":{"value":"user","addr":"F4"},"email":{"value":"","addr":"G4"},"phone":{"value":"","addr":"H4"}}}`)
+
+
+                        // // fill the pending users list
+                        // db4_pending_users.value = JSON.parse(`{"status":"success","data":{"shivend":{"username":{"value":"shivend","addr":"B5"},"password":{"value":"asdf","addr":"C5"},"display_name":{"value":"pending","addr":"D5"},"email":{"value":"2@gmail.com","addr":"G5"},"phone":{"value":2345612488,"addr":"H5"},"db_col":{"value":"#N/A","addr":"E5"},"role":{"value":"","addr":"F5"}}}}`)
+                        //     .data;
+
+
                     });
 
                     const toggle_quiz_creation_mode = () => {
                         emit('create_quiz', !props.is_edit_mode);
                         showDetails.value = !showDetails.value;
-                    }
+                    };
+
+                    const open_Whatsapp = (phone, msgtype) => {
+                        // let msg = "HareKrishna";
+                        // let waurl = `https://wa.me/91${'7260869161'}?text=${msg}`
+                        // console.log(waurl)
+                        // window.open('https://wa.me/'+regforminput.value.admin_no'+?text='+msg+'_blank');
+
+                        // if (msgtype==='form_filled'){
+                        //   // msg = encodeURIComponent(['Hare Krishna Prabhu',
+                        //   // 'PAMHO',
+                        //   // 'Could you please verify my account with this number'].join("\n"));
+                        //   msg = encodeURIComponent("Hare Krishna Pr")
+                        //   window.open(`https://api.whatsapp.com/send?phone=91${regforminput.value.admin_no}&text=${msg}`,'_BLANK');
+                        // }
+                        // else if (msgtype==='verified'){
+                        //   // msg = encodeURIComponent(['Hare Krishna Prabhu','PAMHO','Your account has been verified'].join("\n"));
+                        //   msg = encodeURIComponent("Hare Krishna Pr")
+                        //   window.open(`https://api.whatsapp.com/send?phone=91${phone}&text=${msg}`,'_BLANK');
+
+                        // }
+                    };
 
 
                     return {
@@ -319,74 +533,209 @@
                         toggle_quiz_creation_mode,
                         userCreds,
                         showDetails,
-                        toggleDetailsVisibility
+                        toggleDetailsVisibility,
+                        regformerrors,
+                        regforminput,
+                        registerme,
+                        db4_pending_users,
+                        reg_verification,
+                        fetch_existing_userdata,
+                        fetch_pending_user_data,
+                        verifyUser,
+                        open_Whatsapp
                     };
                 },
                 template: `
 <div v-if="user_is_verified">
 
-   <div @click="toggleDetailsVisibility" class="position-relative">
-        <div class="position-absolute top-0 start-100 translate-middle rounded-circle bg-success text-white d-flex justify-content-center align-items-center"
-            style="width: 50px; height: 50px; border: 4px solid blue; cursor: pointer;">
-            {{ userCreds.display_name.value[0] }}
-        </div>
+  <div @click="toggleDetailsVisibility" class="position-relative">
+    <div
+      class="position-absolute top-0 start-100 translate-middle rounded-circle bg-success text-white d-flex justify-content-center align-items-center"
+      style="width: 50px; height: 50px; border: 4px solid blue; cursor: pointer;">
+      {{ userCreds.display_name.value[0] }}
     </div>
+  </div>
 
-    <div v-if="showDetails" class="position-fixed top-0 start-50 translate-middle-x mt-4 w-75 w-md-50 p-4 bg-light border rounded shadow-lg" style="z-index: 1050;">
+  <div v-if="showDetails"
+        class="position-fixed top-0 start-50 translate-middle-x mt-4 w-75 w-md-50 p-4 bg-light border rounded shadow-lg"
+        style="max-height: 80vh; overflow-y: auto; z-index: 1040;">
+
+        <h4 class="text-center mb-3">About me</h4>
+
         <div class="position-relative">
             <!-- Toggle Edit mode (adjusted position) -->
-            <button class="btn btn-primary mt-4 mb-4" @click="toggle_quiz_creation_mode">
-                {{is_edit_mode?'quit Quiz Creation mode': 'Lets Create Quiz'}}
-                </button>
+            <button v-if="userCreds.role.value.includes('admin,')||allowed_quiz_creation" class="btn btn-primary mt-4 mb-4" @click="toggle_quiz_creation_mode">
+            {{is_edit_mode?'quit Quiz Creation mode': 'Lets Create Quiz'}}
+            </button>
+
             <!-- Close Button (adjusted position) -->
-            <button @click="toggleDetailsVisibility" class="btn-close position-absolute top-0 start-100 translate-middle-x" style="z-index: 1051;"></button>
+            <button @click="toggleDetailsVisibility"
+            class="btn-close border border-danger rounded-circle p-2 position-absolute top-0 start-100 translate-middle-x"
+            style="z-index: 1045;"></button>
 
             <!-- Display User Credentials -->
             <div v-for="(value, key) in userCreds" :key="key">
-                <p><strong>{{ key }}:</strong> {{ value.value }}</p>
+            <p><strong>{{ key }}:</strong> {{ value.value }}</p>
             </div>
-
-            <!-- Sign Out Button -->
-            <button class="btn btn-danger mt-4" @click="logOut">Sign Out</button>
         </div>
-    </div>
+
+      <div v-if="userCreds.role.value.includes('admin,')">
+          <h4 class="text-center mb-3">Pending verification</h4>
+          <button v-if="Object.keys(db4_pending_users).length===0"
+          class="my-3 btn btn-primary"
+          @click="fetch_pending_user_data"
+          >get pending verifications</button>
+          <div style="max-height: 60vh; overflow-y: auto; padding-right: 10px;">
+              <div v-for="(user, username) in db4_pending_users" :key="username" class="border rounded p-3 mb-3 bg-white">
+                  <!-- Always visible fields -->
+                  <div class="d-flex justify-content-between align-items-center">
+                  <p class="mb-0"><strong>Username:</strong> {{ user.username.value }}</p>
+                  <p class="mb-0"><strong>Phone:</strong> {{ user.phone.value }}</p>
+                  <button class="btn btn-sm btn-outline-primary"
+                      @click="reg_verification.expandeduser[username] = !reg_verification.expandeduser[username]">
+                      {{ reg_verification.expandeduser[username] ? "Hide" : "Show More" }}
+                  </button>
+                  </div>
+
+                  <!-- Expandable section -->
+                  <div v-if="reg_verification.expandeduser[username]" class="mt-2">
+                  <p><strong>Email:</strong> {{ user.email.value }}</p>
+                  <p><strong>Role:</strong> {{ user.role.value || '' }}</p>
+
+                  <!-- Input for Display Name -->
+                  <input v-model="reg_verification.display_name[username]" type="text" class="form-control mt-2"
+                      placeholder="Enter Display Name">
+                  <!--
+                  <button class="btn btn-primary my-2"
+                  @click="open_Whatsapp(user.phone.value,'verified')"
+                  >Convey b4 verifying </button> -->
+
+                  <!-- Verify Button -->
+                  <button class="btn mt-2 w-100"
+                      :disabled="reg_verification.display_name[username].trim().length<5"
+                      :class="reg_verification.display_name[username].trim().length<5?'btn-danger':'btn-success'"
+                      @click="verifyUser(username)">
+                      {{reg_verification.display_name[username].trim().length<5?'Cannot Verify':'Verify'}}
+                  </button>
+                  </div>
+              </div>
+          </div>
+        </div>
+
+        <button class="btn btn-danger mt-4" @click="logOut">Sign Out</button>
+
+        </div>
 
 
 
 </div>
-<div v-else>
-    <div class="row justify-content-center">
-        <div class="col-lg-6">
-            <div class="card p-4">
-                <h3 class="mb-4 text-center">Login</h3>
+<div v-else-if="!regforminput.open_reg_form">
+  <div class="row justify-content-center">
+    <div class="col-lg-6">
+      <div class="card p-4">
+        <h3 class="mb-4 text-center">Login</h3>
 
-                <form @submit.prevent="handleSubmit">
-                    <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <input type="text" id="username" v-model="username" class="form-control"
-                            placeholder="Enter your username" required />
-                    </div>
+        <form @submit.prevent="handleSubmit">
+          <div class="mb-3">
+            <label for="username" class="form-label">Username</label>
+            <input type="text" id="username" v-model="username" class="form-control" placeholder="Enter your username"
+              required />
+          </div>
 
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <div class="input-group">
-                            <input id="password" v-model="password" :type="showPassword ? 'text' : 'password'"
-                                class="form-control" placeholder="Enter your password" required />
-                            <button type="button" @click="togglePassword" class="btn btn-outline-secondary">
-                                {{ showPassword ? 'Hide' : 'Show' }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="d-flex flex-column justify-content-center">
-                        <h5 v-if="loginError.haserror" class='text-danger justify-content-center'>{{loginError.msg}} </h5>
-                        <button v-if="allowSubmit" type="submit" class="btn btn-primary">Submit</button>
-                        <button v-else type="submit" class="btn btn-danger" disabled="true">cannot submit</button>
-                    </div>
-                </form>
+          <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <div class="input-group">
+              <input id="password" v-model="password" :type="showPassword ? 'text' : 'password'" class="form-control"
+                placeholder="Enter your password" required />
+              <button type="button" @click="togglePassword" class="btn btn-outline-secondary">
+                {{ showPassword ? 'Hide' : 'Show' }}
+              </button>
             </div>
-        </div>
+          </div>
+
+          <div class="d-flex flex-column justify-content-center">
+            <h5 v-if="loginError.haserror" class='text-danger justify-content-center'>{{loginError.msg}} </h5>
+            <button v-if="allowSubmit" type="submit" class="btn btn-primary">Submit</button>
+            <button v-else type="submit" class="btn btn-danger" disabled="true">cannot submit</button>
+          </div>
+        </form>
+      </div>
     </div>
+  </div>
+
+  <button class="my-2 btn btn-primary" @click="regforminput.open_reg_form=true;fetch_existing_userdata();">New registration</button>
+
+</div>
+
+<div v-else>
+  <div class="mt-5">
+    <button class="my-2 btn btn-success" @click="regforminput.open_reg_form=false">Return to login 🔙</button>
+
+    <div class="row justify-content-center shadow-lg p-4">
+      <div class="col-lg-6">
+        <div class="card p-4">
+          <h3 class="mb-4 text-center">Registeration form</h3>
+
+          <!--
+          <div v-if="regforminput.showPopUp"
+                class="alert alert-success text-center my-3 border border-success rounded p-3 shadow-lg"
+                @click="open_Whatsapp('admin','form_filled')"
+                style="cursor: pointer;">
+              {{ regforminput.popupmsg }}  
+              <br>
+              <strong class="text-primary">(Click to fasten verification)</strong>
+           </div>
+          -->
+
+          <!-- Username -->
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-control" v-model="regforminput.username" placeholder="Enter username" />
+            <small class="text-danger" v-if="regformerrors.username">{{ regformerrors.username }}</small>
+          </div>
+
+          <!-- Password -->
+          <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <div class="input-group">
+              <input v-model="regforminput.password" :type="regforminput.show_password ? 'text' : 'password'"
+                class="form-control" placeholder="Enter your password" required />
+              <button type="button" @click="regforminput.show_password=!regforminput.show_password"
+                class="btn btn-outline-secondary">
+                {{ regforminput.show_password ? 'Hide' : 'Show' }}
+              </button>
+            </div>
+            <small class="text-danger" v-if="regformerrors.password">{{ regformerrors.password }}</small>
+          </div>
+
+          <!-- Phone -->
+          <div class="mb-3">
+            <label class="form-label">Phone number</label>
+            <input type="number" class="form-control" v-model="regforminput.phone"
+              @input="regforminput.phone = regforminput.phone.replace(/\D/g, '')" placeholder="Enter phone number" />
+            <small class="text-danger" v-if="regformerrors.phone">{{ regformerrors.phone }}</small>
+          </div>
+
+          <!-- Email -->
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" v-model="regforminput.email" placeholder="Enter gmail" />
+            <small class="text-danger" v-if="regformerrors.email">{{ regformerrors.email }}</small>
+          </div>
+
+          <!-- Register Button -->
+          <button class="btn w-100 fs-5 fw-bold" :class="regformerrors.allow_register ? 'btn-success' : 'btn-danger'"
+            :disabled="!regformerrors.allow_register" @click="registerme">
+            {{ regformerrors.allow_register ? 'Register' : 'Cannot Register' }}
+          </button>
+        </div>
+
+        <!-- Popup Message -->
+        
+      </div>
+    </div>
+  </div>
+
 </div>
                 `
             };
@@ -447,7 +796,7 @@
 
                             return `${secondsElapsed}|${year}-${month}-${day}|${monthName} ${day}, ${dayName}`
                         }
-                        console.log(`${new_date_value}-${formatDateAsID(new_date_value)}`)
+                        // console.log(`${new_date_value}-${formatDateAsID(new_date_value)}`)
                         if (new_date_value) {
                             emit('dateClicked', formatDateAsID(new_date_value));
                         }
@@ -503,8 +852,8 @@
       `
             };
 
-            // SCQ
-            const SCQ = {
+            // MCQ
+            const MCQ = {
                 props: {
                     // mode of component. edit, attempt, show
                     std_mode: {
@@ -529,6 +878,10 @@
                     // this is for reviewQuiz
                     std_answerData: {
                         type: Object
+                    },
+                    is_scq: {
+                        type: Boolean,
+                        required: true
                     }
                 },
                 emits: ['createdQuestion', 'attemptedQuestion'],
@@ -541,7 +894,7 @@
                         { text: '', isCorrect: false }
                     ]);
 
-                    const selectedOption = ref(-1);
+                    const selectedOption = ref([]);
 
                     if (Object.keys(props.std_questionData).length > 0) {
                         // prefill with question data
@@ -585,13 +938,14 @@
 
                         });
                         // console.log(error_optionList.every(option => option.trim().length > 0))
+                        const correct_answer_validation = props.is_scq ? optionList.value.filter(option => option.isCorrect).length === 1 : optionList.value.filter(option => option.isCorrect).length > 0;
+                        const correct_answer_validation_msg = props.is_scq ? "Should have exactly one correct answer" : "Should have at least one correct answer";
 
                         const is_valid = {
                             questionTitle: questionTitle.value.trim().length > 0 ? "" : "cannot be blank",
                             options: error_optionList,
                             valid_overall: error_optionList.every(option => option.trim().length === 0) &&
-                                questionTitle.value.trim().length > 0 &&
-                                optionList.value.filter(option => option.isCorrect).length === 1
+                                questionTitle.value.trim().length > 0 && correct_answer_validation
                         }
                         // update the parent about how is the question looking
                         emit("createdQuestion", {
@@ -604,7 +958,7 @@
 
                         return {
                             ...is_valid,
-                            errormsg_overall: optionList.value.filter(option => option.isCorrect).length !== 1 ? "Should have exactly one correct answer" : "some error in question"
+                            errormsg_overall: is_valid.valid_overall ? "" : correct_answer_validation_msg
                         }
                     });
 
@@ -625,17 +979,59 @@
 
                     // -----------------for attempt mode
                     const updateUserSelection = (answerIndex) => {
-                        selectedOption.value = answerIndex;
+                        // Toggle selection
+                        if (selectedOption.value.includes(answerIndex)) {
+                            if (!props.is_scq) {
+                                // for MCQ remove the option from selectedOption
+                                selectedOption.value = selectedOption.value.filter(index => index !== answerIndex);
+                            }
+                            // if it is SCQ and already selected then do nothing when clicked again
+                        } else {
+                            // for scq only one option can be selected
+                            if (props.is_scq) {
+                                selectedOption.value = [answerIndex];
+                            }
+                            else {
+                                // for mcq add the option to the value
+                                selectedOption.value.push(answerIndex);
+                            }
 
-                        if (selectedOption.value > -1) {
-                            // have selection something
+                        }
+
+                        // Compute marks
+                        if (selectedOption.value.length > 0) {
+                            let obtainedMarks = -1; // Default value for unattempted question
+                            if (props.is_scq) {
+                                const correctOptionIndex = optionList.value.findIndex(option => option.isCorrect);
+                                obtainedMarks = selectedOption.value[0] === correctOptionIndex ? 1 : 0;
+                            }
+                            else {
+                                const totalCorrectOptions = optionList.value.filter(option => option.isCorrect).length;
+                                const markPerCorrect = 1 / totalCorrectOptions; // Marks per correct answer
+
+                                let correctCount = 0;
+                                let incorrectCount = 0;
+
+                                selectedOption.value.forEach(index => {
+                                    if (optionList.value[index]?.isCorrect) {
+                                        correctCount++;
+                                    } else {
+                                        incorrectCount++;
+                                    }
+                                });
+
+                                obtainedMarks = (correctCount * markPerCorrect) - (incorrectCount * markPerCorrect);
+                                obtainedMarks = parseFloat(obtainedMarks.toFixed(2)); // Round to 2 decimal places
+                            }
+
                             emit('attemptedQuestion', {
                                 _have_answered: true,
-                                _mark_obtained: optionList.value[selectedOption.value]?.isCorrect ? 1 : 0,
-                                selectedOptionIndex: selectedOption.value
-                            })
+                                _mark_obtained: obtainedMarks,
+                                selectedOptionIndices: [...selectedOption.value] // Send selected options as array
+                            });
                         }
                     };
+
 
                     onMounted(() => {
                         // alert("mounted SCQ");
@@ -710,7 +1106,7 @@
     <div v-else-if="std_mode === 'attempt'">
         <!-- Question Container -->
         <div class="p-4 border-2 rounded question-container"
-            :class="selectedOption !== null ? 'bg-success-subtle' : 'bg-danger-subtle'">
+            :class="selectedOption.length > 0 ? 'bg-success-subtle' : 'bg-danger-subtle'">
 
             <!-- Question Title (Read-Only) -->
             <div class="mb-4">
@@ -719,7 +1115,7 @@
 
             <!-- Option List -->
             <div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
-                :class="{'border-warning bg-warning-subtle': selectedOption === index}"
+                :class="{'border-warning bg-warning-subtle': selectedOption.includes(index)}"
                 @click="updateUserSelection(index)">
                 <!-- Selectable Options -->
                 <label class="form-check-label">
@@ -727,7 +1123,7 @@
                 </label>
             </div>
             <!-- Error Message if No Option is Selected -->
-            <div v-if="selectedOption===-1" class="text-danger mt-2">
+            <div v-if="selectedOption.length === 0" class="text-danger mt-2">
                 Please select at least one option.
             </div>
 
@@ -737,7 +1133,7 @@
     <div v-else-if="std_mode==='show'">
         <!-- Question Container -->
         <div class="p-4 border-2 rounded question-container"
-            :class="std_answerData._mark_obtained===1? 'bg-success-subtle' : 'bg-danger-subtle'">
+            :class="std_answerData._mark_obtained > 0 ? 'bg-success-subtle' : 'bg-danger-subtle'">
 
             <!-- Question Title (Read-Only) -->
             <div class="mb-4">
@@ -747,15 +1143,19 @@
             <!-- Option List -->
             <div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
                 :class="[
-            index === std_answerData.selectedOptionIndex ? 'bg-warning-subtle' : '',
-            option.isCorrect ? 'border border-5 border-success rounded p-3' : ''
-            ]">
+                        std_answerData.selectedOptionIndices.includes(index) ? 'bg-warning-subtle' : '',
+                        option.isCorrect ? 'border border-5 border-success rounded p-3' : ''
+                        ]"
+            >
                 <!-- Selectable Options -->
                 <label class="form-check-label">
                     {{ option.text }}
-                     {{index === std_answerData.selectedOptionIndex ? '(your answer)':''}}
+                     {{std_answerData.selectedOptionIndices.includes(index) ? '(your answer)':''}}
                      {{option.isCorrect ? '(correct answer)':''}}
                 </label>
+            </div>
+            <div>
+                <p class="fw-bold text-muted">Marks Obtained: {{ std_answerData._mark_obtained }}</p>
             </div>
         </div>
 
@@ -769,7 +1169,7 @@
             const Qwrapper = {
                 // mode of component. edit, attempt, show
                 components: {
-                    SCQ
+                    MCQ
                 },
                 props: {
 
@@ -829,7 +1229,29 @@
 <div>
     <!-- check if question type is SCQ -->
     <div v-if="std_qtype==='SCQ'">
+        <!--
         <SCQ :std_mode="std_mode"
+             :std_date_has_changed="std_date_has_changed"
+             :std_questionCreationKey="std_questionCreationKey"
+             :std_questionData="std_questionData"
+             :std_answerData="std_answerData"
+             @attemptedQuestion="pass_attemptedQuestion"
+             @createdQuestion="pass_createdQuestion"
+            />
+            -->
+            <MCQ :std_mode="std_mode"
+                 :is_scq="true"
+                 :std_date_has_changed="std_date_has_changed"
+                 :std_questionCreationKey="std_questionCreationKey"
+                 :std_questionData="std_questionData"
+                 :std_answerData="std_answerData"
+                 @attemptedQuestion="pass_attemptedQuestion"
+                 @createdQuestion="pass_createdQuestion"
+                />
+    </div>
+    <div v-else-if="std_qtype==='MCQ'">
+        <MCQ :std_mode="std_mode"
+             :is_scq="false"
              :std_date_has_changed="std_date_has_changed"
              :std_questionCreationKey="std_questionCreationKey"
              :std_questionData="std_questionData"
@@ -1423,7 +1845,7 @@
                     watch(
                         () => props.active_date,
                         (newVal) => {
-                            date_has_changed.value = true;
+                            date_has_changed.value = !date_has_changed.value;
                         },
                         { deep: true } // Ensures nested properties are tracked
                     );
@@ -1441,7 +1863,7 @@
                         const obtained = Object.values(props.quizAnswerData)
                             .reduce((sum, q) => sum + (q._mark_obtained || 0), 0)
                         const full = Object.keys(props.quizAnswerData).length
-                        return `${obtained}/${full}`
+                        return `${parseFloat(obtained.toFixed(2))}/${full}`
                     });
                     const UTC2IST = (utstring) => {
                         const date = new Date(utstring); // Convert to Date object
@@ -1514,6 +1936,223 @@
 
 </div>            `
             };
+             
+             const Leaderboard = {
+    components: {
+    },
+    props: {
+        active_date: {
+            type: String,
+            required: true
+        },
+        quizQuestionData: {
+            type: Object,
+            required: true
+        },
+        quizMetaData: {
+            type: Object,
+            required: true,
+        },
+        quizResponses: {
+            type: Object,
+            required: true
+        },
+        usermap: {
+          type: Object,
+          required: true
+        }
+    },
+    emits: ["get_users"],
+    setup(props, { emit }) {
+      // console.log(Object.keys( props.quizMetaData))
+      // console.log(props.quizMetaData.upload_time)
+      // console.log(props.quizResponses)
+
+        const UTC2IST = (utstring) => {
+            const date = new Date(utstring); // Convert to Date object
+            return date.toLocaleString('en-IN', {
+                timeZone: 'Asia/Kolkata', // IST timezone
+                // year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true, // AM/PM format
+            });
+        };
+        
+        const uploadTime = new Date(props.quizMetaData.upload_time);
+        // const uploadTime = new Date();
+
+  
+        // Compute Attempted & Pending Users counts
+        const attemptedUsers = computed(() => 
+          Object.values(props.quizResponses).filter(user => user.status === "done").length
+        );        
+        const pendingUsers = computed(() => 
+          Object.values(props.quizResponses).filter(user => user.status === "pending").length
+        );
+        const pendingUserList = computed(() => 
+          Object.entries(props.quizResponses)
+          .filter(([key, user]) => user.status === "pending")
+          .map(([key]) => key)
+        );
+        
+        const totalUsers = computed(() => attemptedUsers.value + pendingUsers.value);        
+        const attemptedPercentage = computed(() => totalUsers.value ? (attemptedUsers.value / totalUsers.value) * 100 : 0);
+        
+        const pieChartStyle = computed(() => ({
+          width: "120px",
+          height: "120px",
+          borderRadius: "50%",
+          background: `conic-gradient( #28a745 ${attemptedPercentage.value}%, #dc3545 ${attemptedPercentage.value}%)`
+        }));
+        
+        // Ranking Function
+        const rankUsers = (responses) => {
+          return Object.entries(responses)
+            .filter(([_, user]) => user.status === "done")
+            .map(([name, user]) => {
+              const marks = Object.values(user.answerData).reduce((sum, q) => sum + q._mark_obtained, 0);
+              return {
+                name: name,
+                marks: parseFloat(marks.toFixed(2)),
+                timeTaken: user.metaData.time_taken,
+                uploadTime: user.metaData.upload_time
+              };
+            })
+            .sort((a, b) => 
+              b.marks - a.marks || a.timeTaken - b.timeTaken || new Date(a.uploadTime) - new Date(b.uploadTime)
+            );
+        };
+        
+        const leaderboardWithin24H = computed(() => 
+          rankUsers(props.quizResponses).filter(user => (new Date(user.uploadTime) - uploadTime) <= 24 * 60 * 60 * 1000)
+        );
+        
+        const leaderboardAfter24H = computed(() => 
+          rankUsers(props.quizResponses).filter(user => (new Date(user.uploadTime) - uploadTime) > 24 * 60 * 60 * 1000)
+        );
+
+        onMounted(() => {
+            // alert("review Quiz mounted")
+            emit('get_users',{})
+
+        });
+
+        return {
+            UTC2IST,
+            pieChartStyle,attemptedUsers, pendingUsers,pendingUserList,
+            leaderboardAfter24H,
+            leaderboardWithin24H
+        };
+    },
+
+    template: `
+<div>
+    <div class="container mt-4">
+      <h4 class="text-center">Quiz Attempt Status</h4>
+      
+      <!-- Pie Chart -->
+      <div class="d-flex justify-content-center my-3">
+        <div class="pie-chart" :style="pieChartStyle"></div>
+      </div>
+  
+      <!-- Table for Attempted and Pending Users -->
+      <table class="table table-bordered text-center">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="text-success">Attempted</td>
+            <td>{{ attemptedUsers }}</td>
+          </tr>
+          <tr>
+            <td class="text-danger">Pending</td>
+            <td>{{ pendingUsers }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="pendingUsers>0">
+        <h5 class="bg-danger text-white text-center p-2 rounded mt-5">
+        devotees who are yet to attempt
+        </h5>
+        <table class="table table-bordered text-center">
+          <thead>
+            <tr>
+              <th>name</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr v-for="(user, index) in pendingUserList" :key="index">
+              <td class="text-center">{{ usermap[user] }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+  
+      <!-- Leaderboard Tables -->
+      <div v-if="leaderboardWithin24H.length>0">
+        <h5 class="bg-primary text-white text-center p-2 rounded mt-5">
+        Leaderboard (Attempted within 24 hours)</h5>
+        <table class="table table-striped text-center">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Name</th>
+              <th>Marks</th>
+              <th>Time Taken(s)</th>
+              <th>Upload Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(user, index) in leaderboardWithin24H" :key="user.name">
+              <td>{{ index + 1 }}</td>
+              <td>{{ usermap[user.name] }}</td>
+              <td>{{ user.marks }}</td>
+              <td>{{ user.timeTaken }}</td>
+              <td>{{ UTC2IST(user.uploadTime) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+
+      <div v-if="leaderboardAfter24H.length>0" >
+        <h5 class="bg-warning text-dark text-center p-2 rounded mt-5">
+        Leaderboard (Attempted after 24 hours)</h5>
+        <table class="table table-striped text-center">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Name</th>
+              <th>Marks</th>
+              <th>Time Taken(s)</th>
+              <th>Upload Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(user, index) in leaderboardAfter24H" :key="user.name">
+              <td>{{ index + 1 }}</td>
+              <td>{{ usermap[user.name] }}</td>
+              <td>{{ user.marks }}</td>
+              <td>{{ user.timeTaken }}</td>
+              <td>{{ UTC2IST(user.uploadTime) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="my-5"></div>
+    </div>
+</div>            `
+};
+  
+
 
             // main app
             const app = Vue.createApp({
@@ -1523,13 +2162,17 @@
                     createQuiz,
                     attemptQuiz,
                     reviewQuiz,
-                    Spinner
+                    Spinner,
+                    Leaderboard
                 },
                 setup() {
-
+                    const one_time_run_tracker = ref({
+                        updating_q_creator_access: false,
+                    })
                     // page state related things
                     const is_creating_quiz = ref(false);
                     const active_mode = ref('attempt_show');
+                    const allowed_quiz_creation = ref(false);
 
                     // attempt_show (show the quiz details)
                     // attempt_active (attempting the quiz details)
@@ -1547,9 +2190,20 @@
 
                     // data base related things
                     const qnaDB = ref({});
+
+                    // watch(
+                    //     () => qnaDB.value,
+                    //     (newVal) => {
+                    //         alert("qnaDB updated")
+                    //     },
+                    //     { deep: true } // Ensures nested properties are tracked
+                    // );
                     const activeDate = ref('');
 
                     const active_QuizQuestion = computed(() => {
+                        // console.log("--------------------------")
+                        // console.log(qnaDB.value)
+                        // console.log("--------------------------")
                         if (Object.hasOwn(qnaDB.value, activeDate.value)) {
                             return {
                                 draft: qnaDB.value[activeDate.value].question_data,
@@ -1583,7 +2237,7 @@
 
                     });
 
-                    const quiz_is_locked = computed(()=>{
+                    const quiz_is_locked = computed(() => {
                         return Object.values(active_QuizAnswer.value).some(user => user.status === "done");
                     })
 
@@ -1594,7 +2248,7 @@
                             return numA - numB;  // Ascending order
                         });
                     })
-                    
+
                     const haveAnswered4 = computed(() => {
                         const username = userInfo.value.username?.value;
                         const statusMap = {};
@@ -1602,7 +2256,11 @@
                             statusMap[date] = qnaDB.value[date].answer_by_user[username].status;
                         }
                         // also update the active state
+                        if (active_mode.value=='db_daily'){}
+                        else{
+                          // update only if it is not in dashboard mode
                         active_mode.value = statusMap[activeDate.value] === 'pending' ? 'attempt_show' : 'show'
+                        }
                         return statusMap;
                     })
 
@@ -1613,6 +2271,14 @@
 
                     const updateUserInfo = (newuserinfo) => {
                         userInfo.value = newuserinfo;
+
+                        // fetch data only after login
+                        if (Object.keys(userInfo.value).length > 0) {
+                            // console.log(window.is_development_mode);
+                            if (!window.is_development_mode) {
+                                fetch_data()
+                            }
+                        }
                     }
 
                     const updateActiveDate = (new_date) => {
@@ -1625,6 +2291,25 @@
                             ...newly_created_quiz._metaData,
                             upload_time: new Date().toISOString(),
                             creator: userInfo.value
+                        }
+
+                        // for development purpose
+                        if (window.is_development_mode) {
+
+                            qnaDB.value[activeDate.value] = {
+                                question_data: newly_created_quiz,
+                                answer_by_user: {},
+                                edit_row: 0
+                            }
+
+                            qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value] = {
+                                status: "pending",
+                            }
+
+
+                            console.log(qnaDB.value)
+                            alert('saved in development mode')
+                            return
                         }
 
 
@@ -1645,11 +2330,10 @@
                                 if (response.status === 'success') {
                                     activeDate.value = null;
                                     // reload the data
-                                    spinnerStatus.value = {
-                                        showing: false,
-                                        text: ""
-                                    };
-                                    alert("successfully modified the quiz")
+                                    setTimeout(() => {
+                                        fetch_data();
+                                    }, 500);
+
                                 }
                                 else if (response.status == 'failed') {
                                     // some error  
@@ -1665,11 +2349,11 @@
                             google.script.run.withSuccessHandler((response) => {
                                 if (response.status === 'success') {
                                     activeDate.value = null;
+
                                     // reload the data
-                                    spinnerStatus.value = {
-                                        showing: false,
-                                        text: ""
-                                    };
+                                    setTimeout(() => {
+                                        fetch_data();
+                                    }, 500);
                                     // alert("successfully submitted")
                                 }
                                 else if (response.status == 'failed') {
@@ -1688,6 +2372,15 @@
                         const quizAnswer = JSON.parse(JSON.stringify(updatedQuizAnswer));
                         // console.log(quizAnswer)
 
+
+                        if (window.is_development_mode) {
+                            qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value] = {
+                                status: "done",
+                                ...quizAnswer,
+                            }
+                            return
+                        }
+
                         spinnerStatus.value = {
                             showing: true,
                             text: "submitting your answers"
@@ -1701,11 +2394,9 @@
                             if (response.status === 'success') {
                                 activeDate.value = null;
                                 // reload the data
-                                spinnerStatus.value = {
-                                    showing: false,
-                                    text: ""
-                                };
-                                alert("successfully submitted your answers")
+                                setTimeout(() => {
+                                    fetch_data();
+                                }, 500);
                                 active_mode.value = 'show'
 
                             }
@@ -1724,6 +2415,11 @@
                     };
 
                     const fetch_data = () => {
+
+                        spinnerStatus.value = {
+                            showing: true,
+                            text: "updating database..."
+                        };
                         google.script.run.withSuccessHandler((response) => {
                             if (response.status === 'success') {
                                 qnaDB.value = response.fulldb;
@@ -1732,6 +2428,11 @@
                                     text: ""
                                 };
                                 activeDate.value = active_DateList.value[active_DateList.value.length - 1]
+                                
+                                if(response.creator===userInfo.value.username.value){
+                                    allowed_quiz_creation.value = true;
+                                    one_time_run_tracker.value.updating_q_creator_access = true;
+                                }
 
                             }
                             else if (response.status == 'failed') {
@@ -1743,32 +2444,58 @@
                             }
                         }).qna_get_qnadb_2d();
 
-                    }
+                    };
 
                     // on mount
                     onMounted(() => {
 
-                        // spinnerStatus.value = {
-                        //     showing: true,
-                        //     text: "fetching data"
-                        // };
-                        // fetch_data()
-
-                        // --------------------for testing in local
-                        // simulated that user have logged in
-                        localStorage.setItem("creds", `{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"Shivendra Pr","addr":"D3"},"db_col":{"value":6,"addr":"E3"},"role":{"value":"user, admin","addr":"F3"},"email":{"value":"data4shivendra@gmail.com","addr":"G3"},"phone":{"value":7260869161,"addr":"H3"}}`)
-                        // // simulate that we have fetched database
-                        qnaDB.value = JSON.parse(`{"status":"success","fulldb":{"1739199327|2025-02-10|Feb 10, Mon":{"question_data":{"_qData":{"Q1":{"_is_valid":true,"_id":"Q1","_qtype":"SCQ","_qdata":{"_is_valid":true,"title":"What is goal of life ","optionList":[{"text":"Enjoy ","isCorrect":true},{"text":"Suffer","isCorrect":false}]}}},"_metaData":{"upload_time":"2025-02-11T06:11:54.329Z","creator":{"password":{"addr":"C3","value":"hari"},"role":{"addr":"F3","value":"user, admin"},"phone":{"addr":"H3","value":7260869161},"db_col":{"addr":"E3","value":6},"display_name":{"addr":"D3","value":"Shivendra Pr"},"email":{"addr":"G3","value":"data4shivendra@gmail.com"},"username":{"addr":"B3","value":"shiven"}},"is_active":true,"reference_section":"Testing purpose "},"_is_valid":true},"edit_row":6,"answer_by_user":{"shiven":{"status":"pending"},"parth":{"status":"pending"}}},"1739112701|2025-02-9|Feb 9, Sun":{"question_data":{"_qData":{"Q1":{"_is_valid":true,"_id":"Q1","_qtype":"SCQ","_qdata":{"_is_valid":true,"title":"how is human different from animal","optionList":[{"text":"religion","isCorrect":true},{"text":"strong body","isCorrect":false},{"text":"more intelligent","isCorrect":false},{"text":"added another option","isCorrect":false}]}},"Q2":{"_id":"Q2","_qtype":"SCQ","_qdata":{"_is_valid":true,"title":"added one more question","optionList":[{"text":"with correct option","isCorrect":true},{"text":"and incorrect option","isCorrect":false}]},"_is_valid":true}},"_metaData":{"upload_time":"2025-02-09T14:53:20.441Z","creator":{"password":{"addr":"C3","value":"hari"},"role":{"addr":"F3","value":"user, admin"},"phone":{"addr":"H3","value":7260869161},"db_col":{"addr":"E3","value":6},"display_name":{"addr":"D3","value":"Shivendra Pr"},"email":{"addr":"G3","value":"data4shivendra@gmail.com"},"username":{"addr":"B3","value":"shiven"}},"is_active":true,"reference_section":"this is another testing (updated the title)"},"_is_valid":true},"edit_row":5,"answer_by_user":{"shiven":{"answerData":{"Q1":{"_answerData":{"_have_answered":true,"_mark_obtained":0,"selectedOptionIndex":1},"_have_answered":true,"_mark_obtained":0},"Q2":{"_answerData":{"_have_answered":true,"_mark_obtained":1,"selectedOptionIndex":0},"_have_answered":true,"_mark_obtained":1}},"metaData":{"upload_time":"2025-02-10T11:31:36.578Z","time_taken":6},"status":"done"},"parth":{"status":"pending"}}},"1739011813|2025-02-8|Feb 8, Sat":{"question_data":{"_qData":{"Q1":{"_id":"Q1","_qtype":"SCQ","_qdata":{"_is_valid":true,"title":"which is not a proof of soul exists?","optionList":[{"text":"darwing's theory","isCorrect":true},{"text":"OBE","isCorrect":false},{"text":"reincarnation","isCorrect":false}]},"_is_valid":true},"Q2":{"_id":"Q2","_qtype":"SCQ","_qdata":{"_is_valid":true,"title":"will you attend further sessions?","optionList":[{"text":"yes","isCorrect":true},{"text":"no","isCorrect":false}]},"_is_valid":true}},"_metaData":{"reference_section":"dys 1 questions","is_active":false,"upload_time":"2025-02-08T10:51:55.764Z","creator":{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"Shivendra Pr","addr":"D3"},"db_col":{"value":6,"addr":"E3"},"role":{"value":"user, admin","addr":"F3"},"email":{"value":"data4shivendra@gmail.com","addr":"G3"},"phone":{"value":7260869161,"addr":"H3"}}},"_is_valid":true},"edit_row":2,"answer_by_user":{"shiven":{"status":"pending"},"parth":{"status":"pending"}}}}}`)
-                            .fulldb
-                        activeDate.value = active_DateList.value[active_DateList.value.length - 1]
-
+                        window.is_development_mode = false;
+                        if (window.is_development_mode){
+                          localStorage.setItem("creds", `{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"Shivendra Pr","addr":"D3"},"email":{"value":"data4shivendra@gmail.com","addr":"E3"},"phone":{"value":7260869161,"addr":"F3"},"db_col":{"value":6,"addr":"G3"},"role_std":{"value":"admin,","addr":"H3"},"role":{"value":"admin,","addr":"I3"}}`)
+                        }
 
                     });
+                    
+                    const existing_usermap = ref({});
+                    const get_existing_usermap = ()=>{
+                      if (Object.keys(existing_usermap.value).length>0){
+                        // no need to fetch
+                      }
+                      else {
+                        // fetch from database
+                            spinnerStatus.value = {
+                                    showing: true,
+                                    text: "getting dashboard"
+                                };
+                            google.script.run.withSuccessHandler((response) => {
+                              existing_usermap.value = Object.entries(response.data)
+                              .reduce((acc, [userId, data]) => {
+                                acc[userId] = data.display_name.value;
+                                return acc;
+                              }, {});
+                              // response.data
+                              // .map(([username, userdata]) => {
+                              //   return {
+                              //     username: userdata.display_name.value
+                              //     }
+                              //   });
+
+
+                              spinnerStatus.value = {
+                                    showing: false,
+                                    text: ""
+                                };
+                                // console.log(existing_usermap.value)
+
+                          }).login_get_all_users(false)
+                      }
+                    };
 
 
                     return {
                         spinnerStatus,
                         userInfo,
+                        allowed_quiz_creation,
                         activeDate,
                         active_DateList, haveAnswered4,
                         active_QuizQuestion,
@@ -1782,7 +2509,9 @@
                         updateActiveDate,
                         updateActiveQuiz,
                         updateActiveRespose,
-                        updateSpin
+                        updateSpin,
+                        get_existing_usermap,
+                        existing_usermap
                     };
                 },
 
@@ -1791,6 +2520,7 @@
 <Spinner :is_active="spinnerStatus.showing" :display_text="spinnerStatus.text" />
 <LoginHandler :is_edit_mode="is_creating_quiz"
     :allow_overlay="active_mode!=='attempt_active'"
+    :allowed_quiz_creation="allowed_quiz_creation"
     @update_user_creds="updateUserInfo"
     @spin="updateSpin"
     @create_quiz="updateQuizCreatingMode" />
@@ -1863,7 +2593,7 @@
 
             <!-- Attempt quiz  -->
             <div v-else-if="active_mode==='attempt_show' || active_mode==='attempt_active'">
-                <!-- {{active_QuizQuestion.draft}} -->
+                <!-- {{console.log(active_QuizQuestion.draft)}}-->
                 <attemptQuiz
                     :active_mode="active_mode"
                     :active_date="activeDate"
@@ -1889,6 +2619,14 @@
 
             <!-- Leaderboard -->
             <div v-else-if="active_mode==='db_daily'">
+              <Leaderboard
+                      :active_date="activeDate"
+                      :quizQuestionData="active_QuizQuestion.draft._qData"
+                      :quizMetaData="active_QuizQuestion.draft._metaData"
+                      :quizResponses="active_QuizAnswer.all_answers"
+                      :usermap="existing_usermap"
+                      @get_users="get_existing_usermap"
+                  />
 
             </div>
         </div>
