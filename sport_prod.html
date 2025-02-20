@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>SPORT</title>
-    <script src="https://unpkg.com/vue@3"></script>
+    <!-- <script src="https://unpkg.com/vue@3"></script> -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script> -->
 
@@ -247,6 +248,25 @@
                     watch(userCreds, (newValue, oldValue) => {
                         emit('update_user_creds', userCreds.value)
                     });
+
+                    const display_name_initial = computed(() => {
+                        // Trim spaces
+                        let trimmedName = userCreds.value.display_name?.value || "";
+
+                        // Remove "HG" at the start, if present
+                        if (trimmedName.startsWith("HG")) {
+                            trimmedName = trimmedName.slice(2).trim();
+                        }
+
+                        // Remove "Pr" at the end, if present
+                        if (trimmedName.endsWith("Pr")) {
+                            trimmedName = trimmedName.slice(0, -2).trim();
+                        }
+
+                        // Split into words and take the first letter of each
+                        return trimmedName.split(/\s+/).map(word => word[0]).join("").slice(0, 3);
+                    })
+
                     const user_is_verified = computed(() => {
                         return Object.keys(userCreds.value).length > 0
                     })
@@ -532,6 +552,7 @@
                         user_is_verified,
                         toggle_quiz_creation_mode,
                         userCreds,
+                        display_name_initial,
                         showDetails,
                         toggleDetailsVisibility,
                         regformerrors,
@@ -550,9 +571,9 @@
 
   <div @click="toggleDetailsVisibility" class="position-relative">
     <div
-      class="position-absolute top-0 start-100 translate-middle rounded-circle bg-success text-white d-flex justify-content-center align-items-center"
+      class="position-absolute top-0 start-100 translate-middle rounded-circle bg-success text-white d-flex justify-content-center align-items-center user-select-none"
       style="width: 50px; height: 50px; border: 4px solid blue; cursor: pointer;">
-      {{ userCreds.display_name.value[0] }}
+      {{ display_name_initial }}
     </div>
   </div>
 
@@ -887,31 +908,44 @@
                 emits: ['createdQuestion', 'attemptedQuestion'],
                 setup(props, { emit }) {
 
+                    const mcq_keys = ['mcq_title', 'mcq_optionList'];
+
                     // for creating the question
                     const questionTitle = ref('');
                     const optionList = ref([
                         { text: '', isCorrect: false },
                         { text: '', isCorrect: false }
                     ]);
+                    if (window.is_development_mode) {
+
+                        questionTitle.value = 'Question title';
+                        optionList.value = [
+                            { text: 'option one', isCorrect: true },
+                            { text: 'option two', isCorrect: false }
+                        ];
+                    }
 
                     const selectedOption = ref([]);
+                    const max_marks = computed(() => {
+                        return optionList.value.filter(option => option.isCorrect).length * (props.is_scq ? 1 : 2);
+                    })
 
-                    if (Object.keys(props.std_questionData).length > 0) {
+                    if (mcq_keys.every(key => key in props.std_questionData)) {
                         // prefill with question data
                         // create a copy
                         const cloned_draft = JSON.parse(JSON.stringify(props.std_questionData));
-                        questionTitle.value = cloned_draft.title;
-                        optionList.value = cloned_draft.optionList;
+                        questionTitle.value = cloned_draft.mcq_title;
+                        optionList.value = cloned_draft.mcq_optionList;
                     }
                     // watch for changes in std_questionData
                     watch(
                         () => props.std_date_has_changed,
                         (newVal) => {
                             // alert("change detected")
-                            if (Object.keys(props.std_questionData).length > 0) {
+                            if (mcq_keys.every(key => key in props.std_questionData)) {
                                 const cloned_draft = JSON.parse(JSON.stringify(props.std_questionData))
-                                questionTitle.value = cloned_draft.title;
-                                optionList.value = cloned_draft.optionList;
+                                questionTitle.value = cloned_draft.mcq_title;
+                                optionList.value = cloned_draft.mcq_optionList;
                             } else {
                                 questionTitle.value = "";
                                 optionList.value = [
@@ -938,7 +972,7 @@
 
                         });
                         // console.log(error_optionList.every(option => option.trim().length > 0))
-                        const correct_answer_validation = props.is_scq ? optionList.value.filter(option => option.isCorrect).length === 1 : optionList.value.filter(option => option.isCorrect).length > 0;
+                        const correct_answer_validation = props.is_scq ? max_marks.value === 1 : max_marks.value > 0;
                         const correct_answer_validation_msg = props.is_scq ? "Should have exactly one correct answer" : "Should have at least one correct answer";
 
                         const is_valid = {
@@ -950,11 +984,11 @@
                         // update the parent about how is the question looking
                         emit("createdQuestion", {
                             _is_valid: is_valid.valid_overall,
-                            ...{
-                                title: questionTitle,
-                                optionList: optionList
-                            }
-                        })
+                            _max_marks: max_marks.value,
+                            mcq_title: questionTitle.value,
+                            mcq_optionList: optionList.value
+                        }
+                        )
 
                         return {
                             ...is_valid,
@@ -999,37 +1033,24 @@
                         }
 
                         // Compute marks
+                        let obtained_marks = -1;                        
                         if (selectedOption.value.length > 0) {
-                            let obtainedMarks = -1; // Default value for unattempted question
-                            if (props.is_scq) {
-                                const correctOptionIndex = optionList.value.findIndex(option => option.isCorrect);
-                                obtainedMarks = selectedOption.value[0] === correctOptionIndex ? 1 : 0;
-                            }
-                            else {
-                                const totalCorrectOptions = optionList.value.filter(option => option.isCorrect).length;
-                                const markPerCorrect = 1 / totalCorrectOptions; // Marks per correct answer
+                            obtained_marks = selectedOption.value.reduce((total, ans_index) => {
+                                if (props.is_scq) {
 
-                                let correctCount = 0;
-                                let incorrectCount = 0;
+                                    return total + (optionList.value[ans_index].isCorrect ? 1 : 0);
+                                }
+                                else {
+                                    return total + (optionList.value[ans_index].isCorrect ? 2 : -1);
+                                }
+                            }, 0);
 
-                                selectedOption.value.forEach(index => {
-                                    if (optionList.value[index]?.isCorrect) {
-                                        correctCount++;
-                                    } else {
-                                        incorrectCount++;
-                                    }
-                                });
-
-                                obtainedMarks = (correctCount * markPerCorrect) - (incorrectCount * markPerCorrect);
-                                obtainedMarks = parseFloat(obtainedMarks.toFixed(2)); // Round to 2 decimal places
-                            }
-
-                            emit('attemptedQuestion', {
-                                _have_answered: true,
-                                _mark_obtained: obtainedMarks,
-                                selectedOptionIndices: [...selectedOption.value] // Send selected options as array
-                            });
                         }
+                        emit('attemptedQuestion', {
+                            _have_answered: true,
+                            _mark_obtained: obtained_marks,
+                            selectedOptionIndices: [...selectedOption.value] // Send selected options as array
+                        });
                     };
 
 
@@ -1040,6 +1061,7 @@
                         // used while creating the question
                         questionTitle,
                         optionList,
+                        max_marks,
                         selectedOption,
 
                         add_option, remove_option, toggle_is_correct,
@@ -1056,6 +1078,9 @@
         <!-- Question Container -->
         <div class="p-4 border-2 rounded question-container"
             :class="validationErrors.valid_overall ? 'bg-success-subtle' : 'bg-danger-subtle'">
+            
+            <p class="fw-bold text-muted">{{is_scq ? 'Single correct question' : 'Multiple correct question'}}</p>
+            <p class="fw-bold text-muted">{{is_scq ? 'marking scheme 1 for correct 0 for incorrect' : '+2 for each correct -1 for incorrect'}}</p>
 
             <!-- Question Title -->
             <div class="mb-4">
@@ -1072,9 +1097,13 @@
                 <div v-for="(option, index) in optionList" :key="'option_'+index"
                     class="p-3 border-1 option-container rounded mb-2"
                     :class="{'border border-5 border-success bg-success-subtle': option.isCorrect}">
-                    
+
                     <!-- Option Input -->
-                    <input v-model="option.text" type="text" class="form-control mb-2" placeholder="Enter option text">
+                    <div class="d-flex align-items-center gap-2">
+                        <label :for="'optionText' + index" class="form-label">{{ index + 1 }}.</label>
+                        <input :id="'optionText' + index" v-model="option.text" type="text" class="form-control mb-2" placeholder="Enter option text">
+                    </div>
+
                     <div v-if="validationErrors.options[index]" class="text-danger">
                         {{ validationErrors.options[index] }}
                     </div>
@@ -1084,11 +1113,12 @@
                         <button class="btn btn-outline-success" @click="toggle_is_correct(index)">
                             {{ option.isCorrect ? 'Mark incorrect' : 'Mark correct' }}
                         </button>
-                        <button v-if="optionList.length>2" class="btn btn-outline-danger" @click="remove_option(index)">
+                        <button v-if="optionList.length > 2" class="btn btn-outline-danger" @click="remove_option(index)">
                             Remove
                         </button>
                     </div>
                 </div>
+
             </transition-group>
 
             <!-- Error for correct option selection  -->
@@ -1116,6 +1146,7 @@
             <!-- Option List -->
             <div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
                 :class="{'border-warning bg-warning-subtle': selectedOption.includes(index)}"
+                style="cursor: pointer;"
                 @click="updateUserSelection(index)">
                 <!-- Selectable Options -->
                 <label class="form-check-label">
@@ -1155,7 +1186,339 @@
                 </label>
             </div>
             <div>
-                <p class="fw-bold text-muted">Marks Obtained: {{ std_answerData._mark_obtained }}</p>
+                <p class="fw-bold text-muted">Marks Obtained: {{ std_answerData._mark_obtained }} / {{max_marks}}</p>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+`
+            };
+            // MCQ
+            const CTO = {
+                props: {
+                    // mode of component. edit, attempt, show
+                    std_mode: {
+                        type: String,
+                        required: true
+                    },
+
+                    // this is for creating question
+                    std_questionCreationKey: {
+                        type: String
+                    },
+
+                    std_date_has_changed: {
+                        type: Boolean,
+                        required: true
+                    },
+                    // this is for editQuestion, attemptQuiz, reviewQuiz
+                    std_questionData: {
+                        type: Object
+                    },
+
+                    // this is for reviewQuiz
+                    std_answerData: {
+                        type: Object
+                    }
+                },
+                emits: ['createdQuestion', 'attemptedQuestion'],
+                setup(props, { emit }) {
+
+                    // for creating the question
+                    const cto_keys = ['cto_title', 'cto_optionList', 'cto_display_order'];
+
+                    const questionTitle = ref('');
+                    const optionList = ref([
+                        { text: '' },
+                        { text: '' },
+                    ]);
+                    const display_order = ref([])
+
+                    if (window.is_development_mode) {
+
+                        questionTitle.value = 'Question title';
+                        optionList.value = [
+                            { text: 'first place' },
+                            { text: 'second place' }
+                        ];
+                    }
+
+                    const max_marks = computed(() => {
+                        return optionList.value.length;
+                    })
+
+                    if (cto_keys.every(key => key in props.std_questionData)) {
+                        // prefill with question data
+                        // create a copy
+                        const cloned_draft = JSON.parse(JSON.stringify(props.std_questionData));
+                        questionTitle.value = cloned_draft.cto_title;
+                        optionList.value = cloned_draft.cto_optionList;
+                        display_order.value = cloned_draft.cto_display_order;
+                    }
+                    // watch for changes in std_questionData
+                    watch(
+                        () => props.std_date_has_changed,
+                        (newVal) => {
+                            // alert("change detected")
+                            if (cto_keys.every(key => key in props.std_questionData)) {
+                                const cloned_draft = JSON.parse(JSON.stringify(props.std_questionData))
+                                questionTitle.value = cloned_draft.cto_title;
+                                optionList.value = cloned_draft.cto_optionList;
+                                display_order.value = cloned_draft.cto_display_order;
+                            } else {
+                                questionTitle.value = "";
+                                optionList.value = ref([
+                                    { text: '' },
+                                    { text: '' },
+                                ]);
+                                display_order.value = [];
+
+                            }
+                        },
+                        { deep: true } // Ensures nested properties are tracked
+                    );
+
+
+                    const validationErrors = computed(() => {
+
+                        const error_optionList = [];
+
+                        optionList.value.forEach(element => {
+                            if (element.text.trim().length > 0) {
+                                error_optionList.push("")
+                            }
+                            else {
+                                error_optionList.push("cannot be blank")
+                            }
+
+                        });
+                        // console.log(error_optionList.every(option => option.trim().length > 0))
+                        const correct_answer_validation = max_marks.value > 2;
+                        const correct_answer_validation_msg = "Should have at least three options";
+
+                        const is_valid = {
+                            questionTitle: questionTitle.value.trim().length > 0 ? "" : "cannot be blank",
+                            options: error_optionList,
+                            valid_overall: error_optionList.every(option => option.trim().length === 0) &&
+                                questionTitle.value.trim().length > 0 && correct_answer_validation
+                        }
+                        // update the parent about how is the question looking
+                        display_order.value = create_display_order(optionList.value.length);
+                        // console.log(display_order.value)
+                        emit("createdQuestion", {
+                            _is_valid: is_valid.valid_overall,
+                            _max_marks: max_marks.value,
+                            cto_title: questionTitle.value,
+                            cto_optionList: optionList.value,
+                            cto_display_order: display_order.value
+                        }
+                        )
+
+                        return {
+                            ...is_valid,
+                            errormsg_overall: is_valid.valid_overall ? "" : correct_answer_validation_msg
+                        }
+                    });
+
+                    // Function to add a new option
+                    const create_display_order = (n) => {
+                        // Create an array [0, 1, 2, ..., n-1]
+                        const array = Array.from({ length: n }, (_, i) => i);
+
+                        // Fisher-Yates shuffle
+                        for (let i = array.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [array[i], array[j]] = [array[j], array[i]]; // Swap elements
+                        }
+
+                        return array;
+                    }
+
+                    const add_option = () => {
+                        optionList.value.push({ text: '' });
+                    };
+
+                    // Function to remove an option
+                    const remove_option = (index) => {
+                        optionList.value.splice(index, 1);
+                    };
+
+                    // -----------------for attempt mode
+                    const swap_options = (option_index, moving_direction) => {
+                        // respond to user action
+                        if (moving_direction === 'up') {
+                            // moving direction is up
+                            if (option_index > 0) {
+                                // Swap the elements
+                                [display_order.value[option_index], display_order.value[option_index - 1]] = [display_order.value[option_index - 1], display_order.value[option_index]];
+                            }
+                        }
+                        else {
+                            // moving direction is down
+                            if (option_index < display_order.value.length - 1) {
+                                // Swap the elements
+                                [display_order.value[option_index], display_order.value[option_index + 1]] = [display_order.value[option_index + 1], display_order.value[option_index]];
+                            }
+                        }
+
+                        // -----------------Compute marks
+                        let obtained_marks = 0;
+                        display_order.value.forEach((optionIndex, position) => {
+                            if (optionIndex === position) {
+                                obtained_marks = obtained_marks + 1; // +1 for each correctly placed option
+                            }
+                        });
+
+
+                        emit('attemptedQuestion', {
+                            _have_answered: true,
+                            _mark_obtained: obtained_marks,
+                            selected_display_order: [...display_order.value] // Send selected order as array
+                        });
+                    };
+
+
+                    onMounted(() => {
+                        // alert("mounted SCQ");
+                    })
+                    return {
+                        // used while creating the question
+                        questionTitle,
+                        optionList,
+                        max_marks,
+                        display_order,
+
+                        add_option, remove_option,
+                        validationErrors,
+                        swap_options
+                    };
+                },
+
+                template: `
+<div class="container my-4">
+
+    <div v-if="std_mode==='edit'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container"
+        :class="validationErrors.valid_overall ? 'bg-success-subtle' : 'bg-danger-subtle'">
+            
+            <p class="fw-bold text-muted">Correct the order type question</p>
+            <p class="fw-bold text-muted">while attempting options will be shuffled</p>
+            <p class="fw-bold text-muted"> +1 for bringing each option at correct position</p>
+            <p class="fw-bold text-muted"> no negative marking</p>
+        
+            <!-- Question Title -->
+            <div class="mb-4">
+                <!-- <label for="questionTitle" class="form-label fw-bold"></label>-->
+                <textarea id="questionTitle" v-model="questionTitle" class="form-control" rows="3"
+                    placeholder="Enter your question here..."></textarea>
+                <div v-if="validationErrors.questionTitle" class="text-danger">
+                    {{ validationErrors.questionTitle }}
+                </div>
+            </div>
+
+            <transition-group name="custom-transition" tag="div">
+                <!-- Option List -->
+               <div v-for="(option, index) in optionList" :key="'option_'+index"
+                    class="p-3 border-1 option-container rounded mb-2"
+                    >
+
+                    <!-- Option Input -->
+                    <div class="d-flex align-items-center gap-2">
+                        <label :for="'optionText' + index" class="form-label">{{ index + 1 }}.</label>
+                        <input :id="'optionText' + index" v-model="option.text" type="text" class="form-control mb-2" placeholder="Enter option text">
+                    </div>
+
+                    <div v-if="validationErrors.options[index]" class="text-danger">
+                        {{ validationErrors.options[index] }}
+                    </div>
+
+                    <!-- Buttons (Stacked on Mobile) -->
+                    <div class="d-flex flex-column flex-sm-row gap-2">
+                        <button v-if="optionList.length > 2" class="btn btn-outline-danger" @click="remove_option(index)">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            </transition-group>
+
+            <!-- Error for correct option selection  -->
+            <div v-if="!validationErrors.valid_overall" class="text-danger mt-2">
+                {{ validationErrors.errormsg_overall }}
+            </div>
+
+            <!-- Add Option Button -->
+            <button class="btn btn-outline-primary mt-3" @click="add_option">
+                Add Option
+            </button>
+            {{optionList}}
+        </div>
+    </div>
+
+    <div v-else-if="std_mode === 'attempt'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container bg-secondary-subtle">
+
+            <!-- Question Title (Read-Only) -->
+            <div class="mb-4">
+                <p class="fw-bold">{{ questionTitle }}</p>
+            </div>
+            <p class="fw-bold text-muted">click on an option to move up</p>
+
+            <!-- Option List -->
+                <button v-for="(a_index, index) in display_order" :key="index"
+                    class="btn btn-light border border-3 rounded mb-2 user-select-none w-100 text-start fw-bold"
+                    @click="swap_options(index, 'up')"
+                    style="font-size: 1.2rem; transition: background-color 0.3s ease-in-out, transform 0.3s;">
+                    
+                    <span class="me-2">{{ index + 1 }}.</span>
+                    {{ optionList[a_index].text }}
+                </button>
+
+        </div>
+    </div>
+
+    <div v-else-if="std_mode==='show'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container bg-white-subtle"
+        >
+            <!-- Question Title (Read-Only) -->
+            <div class="mb-4">
+                <p class="fw-bold">{{ questionTitle }}</p>
+            </div>
+            {{optionList}}
+            {{display_order}}
+            <!-- Option List -->
+            <table class="table table-bordered table-responsive-md mt-3">
+                <thead class="table-light">
+                    <tr>
+                    <th>Correct Order</th>
+                    <th>Chosen Order</th>
+                    <th>Marks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(user_index, actual_index) in display_order" :key="user_index">
+                    <!-- Correct Order -->
+                    <td>{{ optionList[actual_index].text }}</td>
+
+                    <!-- Chosen Order (Highlight green if correct) -->
+                    <td  class="fw-bold">
+                        {{ optionList[user_index].text }} {{user_index===actual_index? '✅' : '❌'}}
+                    </td>
+
+                    <!-- Marks Column (+1 for correct, 0 for incorrect) -->
+                    <td class="text-center">
+                        {{ user_index===actual_index ? '+1' : '0' }}
+                    </td>
+                    </tr>
+                </tbody>
+                </table>
+            
+            <div>
+                <p class="fw-bold text-muted">Marks Obtained: {{ std_answerData._mark_obtained }} / {{max_marks}}</p>
             </div>
         </div>
 
@@ -1169,7 +1532,8 @@
             const Qwrapper = {
                 // mode of component. edit, attempt, show
                 components: {
-                    MCQ
+                    MCQ,
+                    CTO
                 },
                 props: {
 
@@ -1229,16 +1593,6 @@
 <div>
     <!-- check if question type is SCQ -->
     <div v-if="std_qtype==='SCQ'">
-        <!--
-        <SCQ :std_mode="std_mode"
-             :std_date_has_changed="std_date_has_changed"
-             :std_questionCreationKey="std_questionCreationKey"
-             :std_questionData="std_questionData"
-             :std_answerData="std_answerData"
-             @attemptedQuestion="pass_attemptedQuestion"
-             @createdQuestion="pass_createdQuestion"
-            />
-            -->
             <MCQ :std_mode="std_mode"
                  :is_scq="true"
                  :std_date_has_changed="std_date_has_changed"
@@ -1260,9 +1614,19 @@
              @createdQuestion="pass_createdQuestion"
             />
     </div>
-</div>
 
-                    `
+    <div v-else-if="std_qtype==='CTO'">
+        <CTO :std_mode="std_mode"
+             :std_date_has_changed="std_date_has_changed"
+             :std_questionCreationKey="std_questionCreationKey"
+             :std_questionData="std_questionData"
+             :std_answerData="std_answerData"
+             @attemptedQuestion="pass_attemptedQuestion"
+             @createdQuestion="pass_createdQuestion"
+            />
+    </div>
+</div>
+               `
 
             };
 
@@ -1292,7 +1656,6 @@
                     const date_has_changed = ref(true);
 
 
-                    const questionTypes = ref(["SCQ", "MCQ"]);
                     const default_QM = {
                         question: {
                             Q1: {
@@ -1303,7 +1666,7 @@
                             }
                         },
                         meta: {
-                            reference_section: "",
+                            reference_section: window.is_development_mode ? "Testing " : "",
                             is_active: false,
                         }
                     }
@@ -1360,6 +1723,12 @@
                         return Object.values(questions.value).every(q => q._is_valid) && metada_is_valid
                     });
 
+                    const total_marks = computed(() => {
+                        return Object.values(questions.value).reduce((total, question) => {
+                            return total + question._qdata._max_marks;
+                        }, 0)
+                    });
+
                     // Function to find the next question key (Q1, Q2, Q3...)
                     const getNextQuestionKey = () => {
                         const keys = Object.keys(questions.value).map(k => parseInt(k.substring(1))); // Extract numbers
@@ -1407,9 +1776,9 @@
 
                         date_has_changed,
                         draft_exists,
-                        questionTypes,
                         metadata_about_quiz,
                         questions,
+                        total_marks,
 
                         isValidQuiz,
 
@@ -1474,6 +1843,11 @@
                         @click="questions[key]._qtype = 'MCQ'">
                         MCQ
                     </button>
+
+                    <button :class="['btn', question._qtype === 'CTO' ? 'btn-primary' : 'btn-outline-primary']"
+                        @click="questions[key]._qtype = 'CTO'">
+                        CTO
+                    </button>
                 </div>
 
                 <!-- Right-Aligned Close Button -->
@@ -1508,13 +1882,14 @@
 
     <!-- Submit button  -->
     <div class="d-flex flex-column align-items-center ">
+        <p class="fw-bold text-muted">Total obtainable Marks: {{ total_marks }}</p>
 
          <button 
             class="mt-3 align-self-start"
             :class="metadata_about_quiz.is_active ? 'btn btn-success' : 'btn btn-danger'"
             @click="metadata_about_quiz.is_active=!metadata_about_quiz.is_active"
         >
-            {{ metadata_about_quiz.is_active ? "Save and launch (click to change)" : "Saving as draft (click to change)" }}
+            {{ metadata_about_quiz.is_active ? "Save and launch (quiz can be attempted)" : "Saving as draft (quiz cannot be attempted)" }}
         </button>
 
 
@@ -1682,6 +2057,7 @@
                         else {
                             // stopping the quiz in between
                             emit('toggleAttemptNow', 'attempt_show');
+                            time_elapsed_since_start_seconds.value = 0;
                             clearInterval(time_elapsed_since_start_ID.value)
                         }
                     }
@@ -1800,11 +2176,6 @@
   
   <!-- <pre><code>{{ JSON.stringify(quizResponse.value, null, 2) }}</code></pre> -->
   </div>
-  <div class="py-4"> </div>
-  <div class="py-4"> </div>
-  <div class="py-4"> </div>
-
-           
             `
 
             };
@@ -1936,120 +2307,120 @@
 
 </div>            `
             };
-             
-             const Leaderboard = {
-    components: {
-    },
-    props: {
-        active_date: {
-            type: String,
-            required: true
-        },
-        quizQuestionData: {
-            type: Object,
-            required: true
-        },
-        quizMetaData: {
-            type: Object,
-            required: true,
-        },
-        quizResponses: {
-            type: Object,
-            required: true
-        },
-        usermap: {
-          type: Object,
-          required: true
-        }
-    },
-    emits: ["get_users"],
-    setup(props, { emit }) {
-      // console.log(Object.keys( props.quizMetaData))
-      // console.log(props.quizMetaData.upload_time)
-      // console.log(props.quizResponses)
 
-        const UTC2IST = (utstring) => {
-            const date = new Date(utstring); // Convert to Date object
-            return date.toLocaleString('en-IN', {
-                timeZone: 'Asia/Kolkata', // IST timezone
-                // year: 'numeric',
-                month: 'short',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true, // AM/PM format
-            });
-        };
-        
-        const uploadTime = new Date(props.quizMetaData.upload_time);
-        // const uploadTime = new Date();
+            const Leaderboard = {
+                components: {
+                },
+                props: {
+                    active_date: {
+                        type: String,
+                        required: true
+                    },
+                    quizQuestionData: {
+                        type: Object,
+                        required: true
+                    },
+                    quizMetaData: {
+                        type: Object,
+                        required: true,
+                    },
+                    quizResponses: {
+                        type: Object,
+                        required: true
+                    },
+                    usermap: {
+                        type: Object,
+                        required: true
+                    }
+                },
+                emits: ["get_users"],
+                setup(props, { emit }) {
+                    // console.log(Object.keys( props.quizMetaData))
+                    // console.log(props.quizMetaData.upload_time)
+                    // console.log(props.quizResponses)
 
-  
-        // Compute Attempted & Pending Users counts
-        const attemptedUsers = computed(() => 
-          Object.values(props.quizResponses).filter(user => user.status === "done").length
-        );        
-        const pendingUsers = computed(() => 
-          Object.values(props.quizResponses).filter(user => user.status === "pending").length
-        );
-        const pendingUserList = computed(() => 
-          Object.entries(props.quizResponses)
-          .filter(([key, user]) => user.status === "pending")
-          .map(([key]) => key)
-        );
-        
-        const totalUsers = computed(() => attemptedUsers.value + pendingUsers.value);        
-        const attemptedPercentage = computed(() => totalUsers.value ? (attemptedUsers.value / totalUsers.value) * 100 : 0);
-        
-        const pieChartStyle = computed(() => ({
-          width: "120px",
-          height: "120px",
-          borderRadius: "50%",
-          background: `conic-gradient( #28a745 ${attemptedPercentage.value}%, #dc3545 ${attemptedPercentage.value}%)`
-        }));
-        
-        // Ranking Function
-        const rankUsers = (responses) => {
-          return Object.entries(responses)
-            .filter(([_, user]) => user.status === "done")
-            .map(([name, user]) => {
-              const marks = Object.values(user.answerData).reduce((sum, q) => sum + q._mark_obtained, 0);
-              return {
-                name: name,
-                marks: parseFloat(marks.toFixed(2)),
-                timeTaken: user.metaData.time_taken,
-                uploadTime: user.metaData.upload_time
-              };
-            })
-            .sort((a, b) => 
-              b.marks - a.marks || a.timeTaken - b.timeTaken || new Date(a.uploadTime) - new Date(b.uploadTime)
-            );
-        };
-        
-        const leaderboardWithin24H = computed(() => 
-          rankUsers(props.quizResponses).filter(user => (new Date(user.uploadTime) - uploadTime) <= 24 * 60 * 60 * 1000)
-        );
-        
-        const leaderboardAfter24H = computed(() => 
-          rankUsers(props.quizResponses).filter(user => (new Date(user.uploadTime) - uploadTime) > 24 * 60 * 60 * 1000)
-        );
+                    const UTC2IST = (utstring) => {
+                        const date = new Date(utstring); // Convert to Date object
+                        return date.toLocaleString('en-IN', {
+                            timeZone: 'Asia/Kolkata', // IST timezone
+                            // year: 'numeric',
+                            month: 'short',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: true, // AM/PM format
+                        });
+                    };
 
-        onMounted(() => {
-            // alert("review Quiz mounted")
-            emit('get_users',{})
+                    const uploadTime = new Date(props.quizMetaData.upload_time);
+                    // const uploadTime = new Date();
 
-        });
 
-        return {
-            UTC2IST,
-            pieChartStyle,attemptedUsers, pendingUsers,pendingUserList,
-            leaderboardAfter24H,
-            leaderboardWithin24H
-        };
-    },
+                    // Compute Attempted & Pending Users counts
+                    const attemptedUsers = computed(() =>
+                        Object.values(props.quizResponses).filter(user => user.status === "done").length
+                    );
+                    const pendingUsers = computed(() =>
+                        Object.values(props.quizResponses).filter(user => user.status === "pending").length
+                    );
+                    const pendingUserList = computed(() =>
+                        Object.entries(props.quizResponses)
+                            .filter(([key, user]) => user.status === "pending")
+                            .map(([key]) => key)
+                    );
 
-    template: `
+                    const totalUsers = computed(() => attemptedUsers.value + pendingUsers.value);
+                    const attemptedPercentage = computed(() => totalUsers.value ? (attemptedUsers.value / totalUsers.value) * 100 : 0);
+
+                    const pieChartStyle = computed(() => ({
+                        width: "120px",
+                        height: "120px",
+                        borderRadius: "50%",
+                        background: `conic-gradient( #28a745 ${attemptedPercentage.value}%, #dc3545 ${attemptedPercentage.value}%)`
+                    }));
+
+                    // Ranking Function
+                    const rankUsers = (responses) => {
+                        return Object.entries(responses)
+                            .filter(([_, user]) => user.status === "done")
+                            .map(([name, user]) => {
+                                const marks = Object.values(user.answerData).reduce((sum, q) => sum + q._mark_obtained, 0);
+                                return {
+                                    name: name,
+                                    marks: parseFloat(marks.toFixed(2)),
+                                    timeTaken: user.metaData.time_taken,
+                                    uploadTime: user.metaData.upload_time
+                                };
+                            })
+                            .sort((a, b) =>
+                                b.marks - a.marks || a.timeTaken - b.timeTaken || new Date(a.uploadTime) - new Date(b.uploadTime)
+                            );
+                    };
+
+                    const leaderboardWithin24H = computed(() =>
+                        rankUsers(props.quizResponses).filter(user => (new Date(user.uploadTime) - uploadTime) <= 24 * 60 * 60 * 1000)
+                    );
+
+                    const leaderboardAfter24H = computed(() =>
+                        rankUsers(props.quizResponses).filter(user => (new Date(user.uploadTime) - uploadTime) > 24 * 60 * 60 * 1000)
+                    );
+
+                    onMounted(() => {
+                        // alert("review Quiz mounted")
+                        emit('get_users', {})
+
+                    });
+
+                    return {
+                        UTC2IST,
+                        pieChartStyle, attemptedUsers, pendingUsers, pendingUserList,
+                        leaderboardAfter24H,
+                        leaderboardWithin24H
+                    };
+                },
+
+                template: `
 <div>
     <div class="container mt-4">
       <h4 class="text-center">Quiz Attempt Status</h4>
@@ -2082,76 +2453,82 @@
         <h5 class="bg-danger text-white text-center p-2 rounded mt-5">
         devotees who are yet to attempt
         </h5>
-        <table class="table table-bordered text-center">
-          <thead>
-            <tr>
-              <th>name</th>
-            </tr>
-          </thead>
+        <div class="table-responsive">
+          <table class="table table-striped text-center" style="max-width: 1200px; margin: auto;">
+            <thead>
+              <tr>
+                <th>name</th>
+              </tr>
+            </thead>
 
-          <tbody>
-            <tr v-for="(user, index) in pendingUserList" :key="index">
-              <td class="text-center">{{ usermap[user] }}</td>
-            </tr>
-          </tbody>
-        </table>
+            <tbody>
+              <tr v-for="(user, index) in pendingUserList" :key="index">
+                <td class="text-center">{{ usermap[user] ? usermap[user] : user }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
   
       <!-- Leaderboard Tables -->
       <div v-if="leaderboardWithin24H.length>0">
         <h5 class="bg-primary text-white text-center p-2 rounded mt-5">
         Leaderboard (Attempted within 24 hours)</h5>
-        <table class="table table-striped text-center">
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Name</th>
-              <th>Marks</th>
-              <th>Time Taken(s)</th>
-              <th>Upload Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(user, index) in leaderboardWithin24H" :key="user.name">
-              <td>{{ index + 1 }}</td>
-              <td>{{ usermap[user.name] }}</td>
-              <td>{{ user.marks }}</td>
-              <td>{{ user.timeTaken }}</td>
-              <td>{{ UTC2IST(user.uploadTime) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="table table-striped text-center" style="max-width: 1200px; margin: auto;">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>Marks</th>
+                <th>Time Taken(s)</th>
+                <th>Upload Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(user, index) in leaderboardWithin24H" :key="user.name">
+                <td>{{ index + 1 }}</td>
+                <td>{{ usermap[user.name] ? usermap[user.name] : user.name }}</td>
+                <td>{{ user.marks }}</td>
+                <td>{{ user.timeTaken }}</td>
+                <td>{{ UTC2IST(user.uploadTime) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
         </div>
 
       <div v-if="leaderboardAfter24H.length>0" >
         <h5 class="bg-warning text-dark text-center p-2 rounded mt-5">
         Leaderboard (Attempted after 24 hours)</h5>
-        <table class="table table-striped text-center">
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Name</th>
-              <th>Marks</th>
-              <th>Time Taken(s)</th>
-              <th>Upload Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(user, index) in leaderboardAfter24H" :key="user.name">
-              <td>{{ index + 1 }}</td>
-              <td>{{ usermap[user.name] }}</td>
-              <td>{{ user.marks }}</td>
-              <td>{{ user.timeTaken }}</td>
-              <td>{{ UTC2IST(user.uploadTime) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="table table-striped text-center" style="max-width: 1200px; margin: auto;">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>Marks</th>
+                <th>Time Taken(s)</th>
+                <th>Upload Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(user, index) in leaderboardAfter24H" :key="user.name">
+                <td>{{ index + 1 }}</td>
+                <td>{{ usermap[user.name] ? usermap[user.name] : user.name }}</td>
+                <td>{{ user.marks }}</td>
+                <td>{{ user.timeTaken }}</td>
+                <td>{{ UTC2IST(user.uploadTime) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
         </div>
         <div class="my-5"></div>
     </div>
 </div>            `
-};
-  
+            };
+
 
 
             // main app
@@ -2191,13 +2568,6 @@
                     // data base related things
                     const qnaDB = ref({});
 
-                    // watch(
-                    //     () => qnaDB.value,
-                    //     (newVal) => {
-                    //         alert("qnaDB updated")
-                    //     },
-                    //     { deep: true } // Ensures nested properties are tracked
-                    // );
                     const activeDate = ref('');
 
                     const active_QuizQuestion = computed(() => {
@@ -2256,10 +2626,10 @@
                             statusMap[date] = qnaDB.value[date].answer_by_user[username].status;
                         }
                         // also update the active state
-                        if (active_mode.value=='db_daily'){}
-                        else{
-                          // update only if it is not in dashboard mode
-                        active_mode.value = statusMap[activeDate.value] === 'pending' ? 'attempt_show' : 'show'
+                        if (['db_daily', 'attempt_active'].includes(active_mode.value)) { }
+                        else {
+                            // update only if it is not in dashboard mode
+                            active_mode.value = statusMap[activeDate.value] === 'pending' ? 'attempt_show' : 'show'
                         }
                         return statusMap;
                     })
@@ -2378,6 +2748,7 @@
                                 status: "done",
                                 ...quizAnswer,
                             }
+                            active_mode.value = 'show';
                             return
                         }
 
@@ -2428,8 +2799,8 @@
                                     text: ""
                                 };
                                 activeDate.value = active_DateList.value[active_DateList.value.length - 1]
-                                
-                                if(response.creator===userInfo.value.username.value){
+
+                                if (response.creator === userInfo.value.username.value) {
                                     allowed_quiz_creation.value = true;
                                     one_time_run_tracker.value.updating_q_creator_access = true;
                                 }
@@ -2450,45 +2821,59 @@
                     onMounted(() => {
 
                         window.is_development_mode = false;
-                        if (window.is_development_mode){
-                          localStorage.setItem("creds", `{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"Shivendra Pr","addr":"D3"},"email":{"value":"data4shivendra@gmail.com","addr":"E3"},"phone":{"value":7260869161,"addr":"F3"},"db_col":{"value":6,"addr":"G3"},"role_std":{"value":"admin,","addr":"H3"},"role":{"value":"admin,","addr":"I3"}}`)
+
+                        if (window.is_development_mode) {
+                            localStorage.setItem("creds", `{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"HG Vadiraj Tirth Pr","addr":"D3"},"email":{"value":"data4shivendra@gmail.com","addr":"E3"},"phone":{"value":7260869161,"addr":"F3"},"db_col":{"value":6,"addr":"G3"},"role_std":{"value":"admin,","addr":"H3"},"role":{"value":"admin,","addr":"I3"}}`)
+                            qnaDB.value = sessionStorage.getItem('qnaDB') ? JSON.parse(sessionStorage.getItem('qnaDB')) : {};
+
+
+                            watch(
+                                () => qnaDB.value,
+                                (newVal) => {
+                                    // alert("qnaDB updated")
+                                    sessionStorage.setItem("qnaDB", JSON.stringify(newVal));
+                                },
+                                { deep: true } // Ensures nested properties are tracked
+                            );
                         }
 
                     });
-                    
+
                     const existing_usermap = ref({});
-                    const get_existing_usermap = ()=>{
-                      if (Object.keys(existing_usermap.value).length>0){
-                        // no need to fetch
-                      }
-                      else {
-                        // fetch from database
+                    const get_existing_usermap = () => {
+                        if (Object.keys(existing_usermap.value).length > 0 || window.is_development_mode) {
+                            // no need to fetch
+                        }
+                        else {
+                            // fetch from database
+
+
                             spinnerStatus.value = {
-                                    showing: true,
-                                    text: "getting dashboard"
-                                };
+                                showing: true,
+                                text: "getting dashboard"
+                            };
                             google.script.run.withSuccessHandler((response) => {
-                              existing_usermap.value = Object.entries(response.data)
-                              .reduce((acc, [userId, data]) => {
-                                acc[userId] = data.display_name.value;
-                                return acc;
-                              }, {});
-                              // response.data
-                              // .map(([username, userdata]) => {
-                              //   return {
-                              //     username: userdata.display_name.value
-                              //     }
-                              //   });
+                                existing_usermap.value = Object.entries(response.data)
+                                    .reduce((acc, [userId, data]) => {
+                                        acc[userId] = data.display_name.value;
+                                        return acc;
+                                    }, {});
+                                // response.data
+                                // .map(([username, userdata]) => {
+                                //   return {
+                                //     username: userdata.display_name.value
+                                //     }
+                                //   });
 
 
-                              spinnerStatus.value = {
+                                spinnerStatus.value = {
                                     showing: false,
                                     text: ""
                                 };
                                 // console.log(existing_usermap.value)
 
-                          }).login_get_all_users(false)
-                      }
+                            }).login_get_all_users(false)
+                        }
                     };
 
 
@@ -2503,6 +2888,7 @@
                         is_creating_quiz,
                         active_mode,
                         quiz_is_locked,
+                        qnaDB,
 
                         updateUserInfo,
                         updateQuizCreatingMode,
@@ -2518,6 +2904,13 @@
                 // main app template
                 template: `
 <Spinner :is_active="spinnerStatus.showing" :display_text="spinnerStatus.text" />
+<!--<pre><code>{{ JSON.stringify(qnaDB, null, 2) }}</code></pre>-->
+
+<div v-if="Object.keys(userInfo).length>0" class="text-center py-3 bg-dark text-white fs-4 fw-bold rounded-pill border- border-success">
+        <span class="cursor-pointer user-select-none">
+        {{Object.keys(userInfo).length>0 ? 'Hare Krishna '+ userInfo.display_name.value : 'Please Login'}}
+        </span>
+    </div>
 <LoginHandler :is_edit_mode="is_creating_quiz"
     :allow_overlay="active_mode!=='attempt_active'"
     :allowed_quiz_creation="allowed_quiz_creation"
@@ -2593,7 +2986,7 @@
 
             <!-- Attempt quiz  -->
             <div v-else-if="active_mode==='attempt_show' || active_mode==='attempt_active'">
-                <!-- {{console.log(active_QuizQuestion.draft)}}-->
+                
                 <attemptQuiz
                     :active_mode="active_mode"
                     :active_date="activeDate"
@@ -2608,6 +3001,8 @@
 
             <!-- Pre-view quiz -->
             <div v-else-if="active_mode==='show'">
+                {{'--------------------------------'}}
+                <!--<pre><code>{{ JSON.stringify(active_QuizAnswer, null, 2) }}</code></pre>-->
                 <reviewQuiz
                     :active_date="activeDate" 
                     :quizQuestionData="active_QuizQuestion.draft._qData"
@@ -2637,6 +3032,9 @@
 
 
     </div>
+    <div class="py-5"> </div>
+    <div class="py-5"> </div>
+    <div class="py-5"> </div>
 </div>
                 `
             });
