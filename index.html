@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SPORT</title>
     <style>
-        /* Remove body margin/padding & ensure full height */
+        /* Global Reset */
         * {
             margin: 0;
             padding: 0;
@@ -16,31 +16,56 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background: #f8f9fa; /* Light gray background */
+            background: #3585d4;
             display: flex;
             justify-content: center;
             align-items: center;
+            font-family: 'Arial', sans-serif;
         }
 
-        /* Centered loading spinner */
-        .loading-container {
+        /* Centered Quote Card */
+        .quote-container {
             position: absolute;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            width: 90%;
+            max-width: 400px;
+            padding: 20px;
             background: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            text-align: center;
             z-index: 10;
+            transition: transform .5s ease-in-out, opacity 0.5s ease-in-out;
+            opacity: 1;
         }
 
+        .quote-text {
+            font-size: 1.2rem;
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .quote-author {
+            font-size: 1rem;
+            color: #007bff; /* Bootstrap primary color */
+            font-style: italic;
+        }
+
+        /* Swipe-up animation when hiding */
+        .hide-quote {
+            transform: translateY(-100%);
+            opacity: 0;
+        }
+
+        /* Loading Spinner */
         .spinner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid rgba(0, 0, 0, 0.1);
-            border-top-color: #007bff; /* Bootstrap primary color */
+            width: 30px;
+            height: 30px;
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-top-color: #007bff;
             border-radius: 50%;
             animation: spin 1s linear infinite;
+            margin: 15px auto 0;
         }
 
         @keyframes spin {
@@ -48,37 +73,75 @@
             to { transform: rotate(360deg); }
         }
 
-        /* Fullscreen iframe with no border */
+        /* Initially position iframe above viewport */
         #app-frame {
             width: 100vw;
             height: 100vh;
             border: none;
             position: absolute;
-            top: 0;
+            top: -100vh; /* Start above the screen */
             left: 0;
             z-index: 1;
-            visibility: hidden; /* Initially hidden until loaded */
+            visibility: hidden;
+            transition: top 1s ease-in-out; /* Smooth slide-down animation */
         }
     </style>
 </head>
 <body>
-    <!-- Loading Screen -->
-    <div class="loading-container" id="loading">
+    <!-- Quote Display -->
+    <div class="quote-container" id="quote-container">
+        <div class="quote-text" id="quote-text">Loading quote...</div>
+        <div class="quote-author" id="quote-author"></div>
         <div class="spinner"></div>
     </div>
 
     <!-- Fullscreen Iframe -->
     <iframe id="app-frame" 
-            src="https://script.google.com/macros/s/AKfycby_O2DRYg3nJl0bhx9GUjq93rBgFmGFhajzP4TzyRBIS94G-cNSKYEIMZIM2F4d0i-m8g/exec" 
+            src="https://script.google.com/macros/s/AKfycbzq9uIdwLxrjYwbWV4zXfs8vpGRtH3dN-vvNShI5ej0d7iknVpZjLWxO_-_G8RZlj7ULw/exec" 
             allowfullscreen 
-            onload="hideLoader()">
+            onload="hideQuote()">
     </iframe>
 
     <script>
-        function hideLoader() {
-            document.getElementById("loading").style.display = "none";
-            document.getElementById("app-frame").style.visibility = "visible";
+        async function fetchQuotes() {
+            try {
+                let storedQuotes = localStorage.getItem("quotes");
+                if (storedQuotes) {
+                    return JSON.parse(storedQuotes);
+                }
+                let response = await fetch("quotedb.json");
+                if (!response.ok) throw new Error("File not found");
+                let quotes = await response.json();
+                localStorage.setItem("quotes", JSON.stringify(quotes));
+                return quotes;
+            } catch (error) {
+                console.error("Error fetching quotes:", error);
+                return [{ quote: "Keep moving forward!", by: "Walt Disney" }]; // Fallback quote
+            }
         }
+
+        async function showRandomQuote() {
+            let quotes = await fetchQuotes();
+            let randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+            document.getElementById("quote-text").textContent = `"${randomQuote.quote}"`;
+            document.getElementById("quote-author").textContent = `- ${randomQuote.by}`;
+        }
+
+        function hideQuote() {
+            let quoteContainer = document.getElementById("quote-container");
+            let appFrame = document.getElementById("app-frame");
+
+            quoteContainer.classList.add("hide-quote"); // Swipe up the quote
+
+            setTimeout(() => {
+                quoteContainer.style.display = "none";
+                appFrame.style.visibility = "visible";
+                appFrame.style.top = "0"; // Slide down the iframe
+            }, 600);
+        }
+
+        // Show quote on load
+        showRandomQuote();
     </script>
 </body>
 </html>

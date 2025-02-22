@@ -1033,7 +1033,7 @@
                         }
 
                         // Compute marks
-                        let obtained_marks = -1;                        
+                        let obtained_marks = -1;
                         if (selectedOption.value.length > 0) {
                             obtained_marks = selectedOption.value.reduce((total, ans_index) => {
                                 if (props.is_scq) {
@@ -1139,8 +1139,8 @@
             :class="selectedOption.length > 0 ? 'bg-success-subtle' : 'bg-danger-subtle'">
 
             <!-- Question Title (Read-Only) -->
-            <div class="mb-4">
-                <p class="fw-bold">{{ questionTitle }}</p>
+            <div class="mb-4 w-100">
+                <p class="fw-bold text-break">{{ questionTitle }}</p>
             </div>
 
             <!-- Option List -->
@@ -1167,8 +1167,8 @@
             :class="std_answerData._mark_obtained > 0 ? 'bg-success-subtle' : 'bg-danger-subtle'">
 
             <!-- Question Title (Read-Only) -->
-            <div class="mb-4">
-                <p class="fw-bold">{{ questionTitle }}</p>
+            <div class="mb-4 w-100">
+                <p class="fw-bold text-break">{{ questionTitle }}</p>
             </div>
 
             <!-- Option List -->
@@ -1180,10 +1180,12 @@
             >
                 <!-- Selectable Options -->
                 <label class="form-check-label">
-                    {{ option.text }}
-                     {{std_answerData.selectedOptionIndices.includes(index) ? '(your answer)':''}}
-                     {{option.isCorrect ? '(correct answer)':''}}
+                {{ option.text }}
+                    <span v-if="std_answerData.selectedOptionIndices.includes(index)">
+                        (grading: {{ option.isCorrect ? '✅' + (is_scq ? '+1' : '+2') : '❌' + (is_scq ? '+0' : '-1') }})
+                    </span>
                 </label>
+
             </div>
             <div>
                 <p class="fw-bold text-muted">Marks Obtained: {{ std_answerData._mark_obtained }} / {{max_marks}}</p>
@@ -1234,7 +1236,15 @@
                         { text: '' },
                         { text: '' },
                     ]);
-                    const display_order = ref([])
+                    const display_order = ref([]);
+                    // watch(
+                    //     () => display_order.value,
+                    //     (newVal) => {
+                    //         console.log(`cto- display order ${display_order.value}`)
+                    //     },
+                    //     { deep: true } // Ensures nested properties are tracked
+                    // );
+
 
                     if (window.is_development_mode) {
 
@@ -1256,6 +1266,7 @@
                         questionTitle.value = cloned_draft.cto_title;
                         optionList.value = cloned_draft.cto_optionList;
                         display_order.value = cloned_draft.cto_display_order;
+                        // console.log(`cto- prefilling display order ${display_order.value}`)
                     }
                     // watch for changes in std_questionData
                     watch(
@@ -1267,6 +1278,7 @@
                                 questionTitle.value = cloned_draft.cto_title;
                                 optionList.value = cloned_draft.cto_optionList;
                                 display_order.value = cloned_draft.cto_display_order;
+                                // console.log(`cto- updating display order ${display_order.value}`)
                             } else {
                                 questionTitle.value = "";
                                 optionList.value = ref([
@@ -1453,7 +1465,6 @@
             <button class="btn btn-outline-primary mt-3" @click="add_option">
                 Add Option
             </button>
-            {{optionList}}
         </div>
     </div>
 
@@ -1462,20 +1473,22 @@
         <div class="p-4 border-2 rounded question-container bg-secondary-subtle">
 
             <!-- Question Title (Read-Only) -->
-            <div class="mb-4">
-                <p class="fw-bold">{{ questionTitle }}</p>
+            <div class="mb-4 w-100">
+                <p class="fw-bold text-break">{{ questionTitle }}</p>
             </div>
-            <p class="fw-bold text-muted">click on an option to move up</p>
 
             <!-- Option List -->
+            <div class="d-flex flex-column gap-3">
                 <button v-for="(a_index, index) in display_order" :key="index"
-                    class="btn btn-light border border-3 rounded mb-2 user-select-none w-100 text-start fw-bold"
-                    @click="swap_options(index, 'up')"
-                    style="font-size: 1.2rem; transition: background-color 0.3s ease-in-out, transform 0.3s;">
-                    
-                    <span class="me-2">{{ index + 1 }}.</span>
+                class="btn btn-outline-secondary fw-semibold px-4 py-2 border-2 rounded-pill w-100 w-sm-auto text-wrap"
+                style="cursor: pointer;!important"
+                @click="swap_options(index, 'up')">
+
+                <span class="me-2">{{ index + 1 }}.</span>
                     {{ optionList[a_index].text }}
-                </button>
+                </button>  
+            </div>
+            <p class="mt-4 fw-bold text-muted">click on an option to move up</p>
 
         </div>
     </div>
@@ -1485,37 +1498,507 @@
         <div class="p-4 border-2 rounded question-container bg-white-subtle"
         >
             <!-- Question Title (Read-Only) -->
-            <div class="mb-4">
-                <p class="fw-bold">{{ questionTitle }}</p>
+            <div class="mb-4 w-100">
+                <p class="fw-bold text-break">{{ questionTitle }}</p>
             </div>
-            {{optionList}}
-            {{display_order}}
             <!-- Option List -->
-            <table class="table table-bordered table-responsive-md mt-3">
-                <thead class="table-light">
-                    <tr>
-                    <th>Correct Order</th>
-                    <th>Chosen Order</th>
-                    <th>Marks</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(user_index, actual_index) in display_order" :key="user_index">
-                    <!-- Correct Order -->
-                    <td>{{ optionList[actual_index].text }}</td>
+            <div class="container mt-4">
+                    <!-- Responsive Table Wrapper -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                        <thead class="table-light">
+                            <tr>
+                            <th>Correct Order</th>
+                            <th>Chosen Order</th>
+                            <th>grading</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(user_index, actual_index) in std_answerData.selected_display_order" :key="user_index">
+                            <!-- Correct Order -->
+                        <td class="align-middle text-center">
+                                <button
+                                    class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto"
+                                    style="cursor: pointer;!important">
+                                        {{optionList[actual_index].text }}
+                                </button>
+                                </td>
+                                
+                            <!-- Chosen Order (Highlight green if correct) -->
+                        <td class="align-middle text-center">
+                                <button
+                                    class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto"
+                                    style="cursor: pointer;!important">
+                                       {{ optionList[user_index].text }}
+                                </button>
+                            </td>
 
-                    <!-- Chosen Order (Highlight green if correct) -->
-                    <td  class="fw-bold">
-                        {{ optionList[user_index].text }} {{user_index===actual_index? '✅' : '❌'}}
-                    </td>
+                            <!-- Marks Column (+1 for correct, 0 for incorrect) -->
+                            <td class="align-middle text-center">
+                                {{user_index===actual_index? '✅ +1' : '❌ +0'}}
+                            </td>
+                            </tr>
+                        </tbody>
+                        </table>
+                    </div>
+                </div>
+            
+            <div>
+                <p class="fw-bold text-muted">Marks Obtained: {{ std_answerData._mark_obtained }} / {{max_marks}}</p>
+            </div>
+        </div>
 
-                    <!-- Marks Column (+1 for correct, 0 for incorrect) -->
-                    <td class="text-center">
-                        {{ user_index===actual_index ? '+1' : '0' }}
-                    </td>
-                    </tr>
-                </tbody>
-                </table>
+    </div>
+
+</div>
+`
+            };
+            const MTF = {
+                props: {
+                    // mode of component. edit, attempt, show
+                    std_mode: {
+                        type: String,
+                        required: true
+                    },
+
+                    // this is for creating question
+                    std_questionCreationKey: {
+                        type: String
+                    },
+
+                    std_date_has_changed: {
+                        type: Boolean,
+                        required: true
+                    },
+                    // this is for editQuestion, attemptQuiz, reviewQuiz
+                    std_questionData: {
+                        type: Object
+                    },
+
+                    // this is for reviewQuiz
+                    std_answerData: {
+                        type: Object
+                    }
+                },
+                emits: ['createdQuestion', 'attemptedQuestion'],
+                setup(props, { emit }) {
+
+                    // for creating the question
+                    const mtf_keys = ['mtf_title', 'mtf_optionList', 'mtf_display_order', 'mtf_headers'];
+
+                    const questionTitle = ref('');
+                    const optionList = ref([
+                        { left: '', right: '' },
+                        { left: '', right: '' },
+                    ]);
+                    const display_order = ref([]);
+                    // watch(
+                    //     () => display_order.value,
+                    //     (newVal) => {
+                    //         console.log(`display order ${display_order.value}`)
+                    //     },
+                    //     { deep: true } // Ensures nested properties are tracked
+                    // );
+                    const table_headers = ref({ left: '', right: '' })
+
+                    if (window.is_development_mode) {
+
+                        questionTitle.value = 'Question title';
+                        optionList.value = [
+                            { left: 'sun', right: 'sunshine' },
+                            { left: 'God', right: 'soul' },
+                        ];
+                        table_headers.value = { left: 'left', right: 'right' }
+                    }
+
+                    const max_marks = computed(() => {
+                        return optionList.value.length;
+                    })
+
+                    if (mtf_keys.every(key => key in props.std_questionData)) {
+                        // prefill with question data
+                        // create a copy
+                        const cloned_draft = JSON.parse(JSON.stringify(props.std_questionData));
+                        questionTitle.value = cloned_draft.mtf_title;
+                        optionList.value = cloned_draft.mtf_optionList;
+                        display_order.value = cloned_draft.mtf_display_order;
+                        table_headers.value = cloned_draft.mtf_headers;
+                        // console.log(`prefilling display order ${display_order.value}`)
+
+                    }
+                    // watch for changes in std_questionData
+                    watch(
+                        () => props.std_date_has_changed,
+                        (newVal) => {
+                            // alert("change detected")
+                            if (mtf_keys.every(key => key in props.std_questionData)) {
+                                const cloned_draft = JSON.parse(JSON.stringify(props.std_questionData))
+                                questionTitle.value = cloned_draft.mtf_title;
+                                optionList.value = cloned_draft.mtf_optionList;
+                                display_order.value = cloned_draft.mtf_display_order;
+                                table_headers.value = cloned_draft.mtf_headers;
+                                // console.log(`onchange of date display order ${display_order.value}`)
+                            } else {
+                                questionTitle.value = "";
+                                optionList.value = ref([
+                                    { left: '', right: '' },
+                                    { left: '', right: '' },
+                                ]);
+                                display_order.value = [];
+                                table_headers.value = { left: '', right: '' }
+
+                            }
+                        },
+                        { deep: true } // Ensures nested properties are tracked
+                    );
+
+
+                    const validationErrors = computed(() => {
+
+                        const header_error = {
+                            left: table_headers.value.left.trim().length > 0 ? '' : 'empty header',
+                            right: table_headers.value.right.trim().length > 0 ? '' : 'empty header'
+                        }
+
+                        const error_optionList = [];
+                        optionList.value.forEach(row => {
+                            error_optionList.push({
+                                left: row.left.trim().length > 0 ? '' : 'empty value',
+                                right: row.right.trim().length > 0 ? '' : 'empty value'
+                            })
+                        });
+
+                        const correct_answer_validation = max_marks.value > 2;
+                        const correct_answer_validation_msg = "Should have at least three entries";
+
+                        const is_valid = {
+                            questionTitle: questionTitle.value.trim().length > 0 ? "" : "empty question title",
+                            headers: header_error,
+                            options: error_optionList,
+                            valid_overall: error_optionList.every(row => {
+                                return row.left.trim().length === 0 && row.right.trim().length === 0
+                            }) &&
+                                questionTitle.value.trim().length > 0 && correct_answer_validation
+                                && header_error.left.trim().length === 0 && header_error.right.trim().length === 0
+                        }
+                        // update the parent about how is the question looking
+                        display_order.value = create_display_order(optionList.value.length);
+                        // console.log(display_order.value)
+                        emit("createdQuestion", {
+                            _is_valid: is_valid.valid_overall,
+                            _max_marks: max_marks.value,
+                            mtf_title: questionTitle.value,
+                            mtf_headers: table_headers.value,
+                            mtf_optionList: optionList.value,
+                            mtf_display_order: display_order.value
+                        }
+                        )
+
+                        return {
+                            ...is_valid,
+                            errormsg_overall: is_valid.valid_overall ? "" : correct_answer_validation_msg
+                        }
+                    });
+
+                    // Function to add a new option
+                    const create_display_order = (n) => {
+                        // Create an array [0, 1, 2, ..., n-1]
+                        const array = Array.from({ length: n }, (_, i) => i);
+
+                        // Fisher-Yates shuffle
+                        for (let i = array.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [array[i], array[j]] = [array[j], array[i]]; // Swap elements
+                        }
+
+                        return array;
+                    }
+
+                    const add_option = () => {
+                        optionList.value.push({ left: '', right: '' });
+                    };
+
+                    // Function to remove an option
+                    const remove_option = (index) => {
+                        optionList.value.splice(index, 1);
+                    };
+
+                    // -----------------for attempt mode
+                    const swap_options = (option_index, moving_direction) => {
+                        // respond to user action
+                        if (moving_direction === 'up') {
+                            // moving direction is up
+                            if (option_index > 0) {
+                                // Swap the elements
+                                [display_order.value[option_index], display_order.value[option_index - 1]] = [display_order.value[option_index - 1], display_order.value[option_index]];
+                            }
+                        }
+                        else {
+                            // moving direction is down
+                            if (option_index < display_order.value.length - 1) {
+                                // Swap the elements
+                                [display_order.value[option_index], display_order.value[option_index + 1]] = [display_order.value[option_index + 1], display_order.value[option_index]];
+                            }
+                        }
+
+                        // -----------------Compute marks
+                        let obtained_marks = 0;
+                        display_order.value.forEach((optionIndex, position) => {
+                            if (optionIndex === position) {
+                                obtained_marks = obtained_marks + 1; // +1 for each correctly placed option
+                            }
+                        });
+
+
+                        emit('attemptedQuestion', {
+                            _have_answered: true,
+                            _mark_obtained: obtained_marks,
+                            selected_display_order: [...display_order.value] // Send selected order as array
+                        });
+                    };
+
+
+                    onMounted(() => {
+                        // alert("mounted SCQ");
+                        // const ping = 
+                    })
+                    return {
+                        // used while creating the question
+                        questionTitle,
+                        table_headers,
+                        optionList,
+                        max_marks,
+                        display_order,
+
+                        add_option, remove_option,
+                        validationErrors,
+                        swap_options
+                    };
+                },
+
+                template: `
+<div class="container my-4">
+
+    <div v-if="std_mode==='edit'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container"
+        :class="validationErrors.valid_overall ? 'bg-success-subtle' : 'bg-danger-subtle'">
+            
+            <p class="fw-bold text-muted">Match the following type question</p>
+            <p class="fw-bold text-muted">while attempting options in the right will be shuffled</p>
+            <p class="fw-bold text-muted"> +1 for bringing each correct match</p>
+            <p class="fw-bold text-muted"> no negative marking</p>
+        
+            <!-- Question Title -->
+            <div class="mb-4">
+                <!-- <label for="questionTitle" class="form-label fw-bold"></label>-->
+                <textarea id="questionTitle" v-model="questionTitle" class="form-control" rows="3"
+                    placeholder="Enter your question here..."></textarea>
+                <div v-if="validationErrors.questionTitle" class="text-danger">
+                    {{ validationErrors.questionTitle }}
+                </div>
+            </div>
+
+                <div class="container mt-4">
+                    <!-- Responsive Table Wrapper -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">
+                                        <input v-model="table_headers.left" type="text" class="form-control"
+                                            placeholder="Enter left header">
+                                        <div v-if="validationErrors.headers.left" class="text-danger small">
+                                            {{ validationErrors.headers.left }}
+                                        </div>
+                                    </th>
+                                    <th class="text-center">
+                                        <input v-model="table_headers.right" type="text" class="form-control"
+                                            placeholder="Enter Right header">
+                                        <div v-if="validationErrors.headers.right" class="text-danger small">
+                                            {{ validationErrors.headers.right }}
+                                        </div>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(option, index) in optionList" :key="index">
+                                    <!-- Left Column -->
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <label :for="'optionText' + index" class="form-label">{{ index + 1 }}.</label>
+                                            <input :id="'optionText' + index" v-model="option.left" type="text" class="form-control" placeholder="enter text">
+                                        </div>
+                                        <div v-if="validationErrors.options[index].left" class="text-danger small">
+                                            {{validationErrors.options[index].left}}
+                                        </div>
+                                    </td>
+
+                                    <!-- Right Column -->
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <label :for="'optionText' + index" class="form-label">{{ String.fromCharCode(97 + index) }}.</label>
+                                            <input :id="'optionText' + index" v-model="option.right" type="text" class="form-control" placeholder="enter text">
+
+                                            <button v-if="optionList.length>2" class="btn btn-danger btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width: 24px; height: 24px; padding: 0; font-size: 14px;"
+                                                @click="remove_option(index)">
+                                                &times;
+                                            </button>
+
+                                        </div>
+                                        <div v-if="validationErrors.options[index].right" class="text-danger small">
+                                            {{validationErrors.options[index].right}}
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>          
+
+            <!-- Error for correct option selection  -->
+            <div v-if="!validationErrors.valid_overall" class="text-danger mt-2">
+                {{ validationErrors.errormsg_overall }}
+            </div>
+
+            <!-- Add Option Button -->
+            <button class="btn btn-outline-primary mt-3" @click="add_option">
+                Add Option
+            </button>
+        </div>
+    </div>
+
+    <div v-else-if="std_mode === 'attempt'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container bg-secondary-subtle">
+
+            <!-- Question Title (Read-Only) -->
+            <div class="mb-4 w-100">
+                <p class="fw-bold text-break">{{ questionTitle }}</p>
+            </div>
+                       
+            
+            <div class="container mt-4">
+                    <!-- Responsive Table Wrapper -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">
+                                        <button class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                            {{table_headers.left}}
+                                        </button>
+                                    </th>
+                                    <th class="text-center">
+                                        <button class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                            {{table_headers.right}}
+                                        </button>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(a_index, index) in display_order" :key="'table_row_'+index">
+                                    <!-- Left Column -->
+                                   <td class="align-middle text-center">
+                                        <span class="me-2">{{ index + 1 }}.</span>
+                                        {{ optionList[index].left }}
+                                    </td>
+
+
+                                    <!-- Right Column -->
+                                    <td class="align-middle text-center">
+
+                                        <button
+                                        class="btn btn-outline-secondary fw-semibold px-4 py-2 border-2 rounded-pill w-100 w-sm-auto text-wrap"
+                                        style="cursor: pointer;!important"
+                                        @click="swap_options(index, 'up')"
+                                        >
+                                            {{ optionList[a_index].right }}
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                    </div>
+                </div> 
+                 <p class="text-muted">
+                <span class="fw-bold">{{ table_headers.left }}</span> are fixed, 
+                <span class="fw-bold">{{ table_headers.right }}</span> can be moved. Click on an option to move up.
+            </p>       
+
+        </div>
+    </div>
+
+    <div v-else-if="std_mode==='show'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container bg-white-subtle">
+            <!-- Question Title (Read-Only) -->
+            <div class="mb-4 w-100">
+                <p class="fw-bold text-break">{{ questionTitle }}</p>
+            </div>
+            
+            <div class="container mt-4">
+                    <!-- Responsive Table Wrapper -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">
+                                       <button class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                            {{table_headers.left}}
+                                        </button>
+                                    </th>
+                                    <th class="text-center">
+                                        <button class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                            {{table_headers.right}}
+                                        </button>
+                                    </th>
+                                    <th class="align-middle text-center">
+                                        <button class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                            grading
+                                        </button>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(a_index, index) in std_answerData.selected_display_order" :key="index">
+                                    <!-- Left Column -->
+                                    <td>
+
+                                        <div class="d-flex align-items-center gap-2">
+                                            <label :for="'metric_left' + index" class="form-label">{{ index + 1 }}.</label>
+                                            <button class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                                {{ optionList[index].left }}
+                                            </button>
+                                        </div>
+                                        
+                                    </td>
+
+                                    <!-- Right Column -->
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <button class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                                {{ optionList[a_index].right }}
+                                            </button>
+                                        </div>
+                                    
+                                    </td>
+                                    <td class="text-center">
+                                         <div class="d-flex align-items-center gap-2">
+                                            <label :for="'metric_grading' + index" class="form-label">
+                                                {{index===a_index ? '✅ +1':'❌ 0'}}
+                                                {{index===a_index ? '':'' }}
+                                            </label>
+                                            
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>          
+
             
             <div>
                 <p class="fw-bold text-muted">Marks Obtained: {{ std_answerData._mark_obtained }} / {{max_marks}}</p>
@@ -1533,7 +2016,8 @@
                 // mode of component. edit, attempt, show
                 components: {
                     MCQ,
-                    CTO
+                    CTO,
+                    MTF
                 },
                 props: {
 
@@ -1617,6 +2101,17 @@
 
     <div v-else-if="std_qtype==='CTO'">
         <CTO :std_mode="std_mode"
+             :std_date_has_changed="std_date_has_changed"
+             :std_questionCreationKey="std_questionCreationKey"
+             :std_questionData="std_questionData"
+             :std_answerData="std_answerData"
+             @attemptedQuestion="pass_attemptedQuestion"
+             @createdQuestion="pass_createdQuestion"
+            />
+    </div>
+
+    <div v-else-if="std_qtype==='MTF'">
+        <MTF :std_mode="std_mode"
              :std_date_has_changed="std_date_has_changed"
              :std_questionCreationKey="std_questionCreationKey"
              :std_questionData="std_questionData"
@@ -1848,6 +2343,11 @@
                         @click="questions[key]._qtype = 'CTO'">
                         CTO
                     </button>
+
+                    <button :class="['btn', question._qtype === 'MTF' ? 'btn-primary' : 'btn-outline-primary']"
+                        @click="questions[key]._qtype = 'MTF'">
+                        MTF
+                    </button>
                 </div>
 
                 <!-- Right-Aligned Close Button -->
@@ -2042,7 +2542,7 @@
                         quizResponse.value[key]._have_answered = data._have_answered;
                         quizResponse.value[key]._mark_obtained = data._mark_obtained;
 
-                        date_has_changed.value = false;
+                        // date_has_changed.value = false;
                     };
 
                     const toggle_attempt_start = () => {
@@ -2141,8 +2641,10 @@
 
 <div v-else>
 
-    <div class="text-center py-3 bg-dark text-white fs-2 fw-bold">
-        <span class="cursor-pointer" @dblclick="toggle_attempt_start">🕒 {{ time_elapsed_since_start_display }}</span>
+    <div class="text-center py-3 bg-dark text-white fs-2 fw-bold"
+    style="cursor: pointer;">
+        <span class="user-select-none"
+        @dblclick="toggle_attempt_start">🕒 {{ time_elapsed_since_start_display }}</span>
     </div>   
     <label class="small text-muted">you are attempting the quiz of <strong>{{active_date.split('|')[2]}}</strong> from section <strong>{{quizMetaData.reference_section}}</strong> </label>
   <!-- Questions List -->
@@ -2232,9 +2734,12 @@
 
                     const marks_obtained = computed(() => {
                         const obtained = Object.values(props.quizAnswerData)
-                            .reduce((sum, q) => sum + (q._mark_obtained || 0), 0)
-                        const full = Object.keys(props.quizAnswerData).length
-                        return `${parseFloat(obtained.toFixed(2))}/${full}`
+                            .reduce((sum, q) => sum + q._mark_obtained, 0)
+
+                        const max_marks = Object.values(props.quizQuestionData)
+                            .reduce((sum, q) => sum + q._qdata._max_marks, 0)
+
+                        return `${parseFloat(obtained.toFixed(2))}/${max_marks}`
                     });
                     const UTC2IST = (utstring) => {
                         const date = new Date(utstring); // Convert to Date object
@@ -2274,9 +2779,10 @@
       <div class="row mt-3 ">
         <div class="col-md-6  text-center">
           <p class="text-muted mb-1"><strong>Uploaded on:</strong> {{ UTC2IST(quizMetaData.upload_time) }}</p>
-          <p class="text-muted mb-1"><strong>Submitted on:</strong> {{ UTC2IST(quizAnswerMetaData.upload_time) }}</p>
-        </div>
-        <div class="col-md-6  text-center">
+          <p class="text-muted mb-1"><strong>Created by :</strong> {{ quizMetaData.creator.display_name.value }}</p>
+          </div>
+          <div class="col-md-6  text-center">
+            <p class="text-muted mb-1"><strong>Submitted on:</strong> {{ UTC2IST(quizAnswerMetaData.upload_time) }}</p>
           <p class="text-muted mb-1"><strong>Duration:</strong> {{ time_taken_to_attempt }}</p>
           <p class="text-muted mb-1"><strong>Marks Obtained:</strong> <span class="fw-bold text-success fs-5">{{
               marks_obtained }}</span></p>
