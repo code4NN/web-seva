@@ -228,8 +228,8 @@
                         type: Boolean,
                         required: true
                     },
-                    allowed_quiz_creation: {
-                        type: Boolean,
+                    app_state_info: {
+                        type: Object,
                         required: true
                     }
                 },
@@ -568,31 +568,46 @@
                 },
                 template: `
 <div v-if="user_is_verified">
-
-  <div @click="toggleDetailsVisibility" class="position-relative">
+    
     <div
-      class="position-absolute top-0 start-100 translate-middle rounded-circle bg-success text-white d-flex justify-content-center align-items-center user-select-none"
-      style="width: 50px; height: 50px; border: 4px solid blue; cursor: pointer;">
-      {{ display_name_initial }}
+      class="text-center py-3 fs-4 fw-bold rounded-pill border border-success d-flex flex-column align-items-center justify-content-center"
+      :class="{
+        'bg-dark text-white': !app_state_info.is_updating_database,
+        'bg-secondary text-light': app_state_info.is_updating_database
+      }"
+      @click="toggleDetailsVisibility"
+    style="cursor: pointer;"
+      >
+      <!-- Main Text -->
+      <span class="cursor-pointer user-select-none">
+        {{ 'Hare Krishna ' + userCreds.display_name.value }}
+      </span>
+
+      <!-- Spinner + "Updating DB..." text (Shown Below When Updating) -->
+      <div v-if="app_state_info.is_updating_database" class="d-flex gap-2 align-items-center mt-1">
+        <div class="spinner-border spinner-border-sm text-light" role="status"></div>
+        <small>updating database...</small>
+      </div>
     </div>
-  </div>
+    
+
 
   <div v-if="showDetails"
-        class="position-fixed top-0 start-50 translate-middle-x mt-4 w-75 w-md-50 p-4 bg-light border rounded shadow-lg"
-        style="max-height: 80vh; overflow-y: auto; z-index: 1040;">
+    class="w-100 mt-3 p-4 bg-light border rounded shadow-sm"
+      style="max-height: 60vh; overflow-y: auto;">
 
         <h4 class="text-center mb-3">About me</h4>
 
         <div class="position-relative">
             <!-- Toggle Edit mode (adjusted position) -->
-            <button v-if="userCreds.role.value.includes('admin,')||allowed_quiz_creation" class="btn btn-primary mt-4 mb-4" @click="toggle_quiz_creation_mode">
+            <button v-if="userCreds.role.value.includes('admin,')||app_state_info.allowed_quiz_creation" class="btn btn-primary mt-4 mb-4" @click="toggle_quiz_creation_mode">
             {{is_edit_mode?'quit Quiz Creation mode': 'Lets Create Quiz'}}
             </button>
 
-            <!-- Close Button (adjusted position) -->
+            <!-- Close Button (adjusted position) 
             <button @click="toggleDetailsVisibility"
             class="btn-close border border-danger rounded-circle p-2 position-absolute top-0 start-100 translate-middle-x"
-            style="z-index: 1045;"></button>
+            style="z-index: 1045;"></button> -->
 
             <!-- Display User Credentials -->
             <div v-for="(value, key) in userCreds" :key="key">
@@ -3055,7 +3070,10 @@
                     // page state related things
                     const is_creating_quiz = ref(false);
                     const active_mode = ref('attempt_show');
-                    const allowed_quiz_creation = ref(false);
+                    const app_state_info = ref({
+                        allowed_quiz_creation: false,
+                        is_updating_database: true
+                    })
 
                     // attempt_show (show the quiz details)
                     // attempt_active (attempting the quiz details)
@@ -3199,8 +3217,6 @@
                             // modifying a quiz
 
                             const existing_row = active_QuizQuestion.value.database_row;
-                            const questiondata_column = 5;
-                            // alert (`upload to ${existing_row}, ${questiondata_column}`)
 
                             google.script.run.withSuccessHandler((response) => {
                                 if (response.status === 'success') {
@@ -3218,7 +3234,7 @@
                                         text: ""
                                     };
                                 }
-                            }).qna_upload_to_cell(JSON.stringify(newly_created_quiz), existing_row, questiondata_column);
+                            }).qna_modify_quiz(JSON.stringify(newly_created_quiz), existing_row);
                         }
                         else {
                             // uploading a new quiz
@@ -3265,7 +3281,6 @@
 
                         const existing_row = active_QuizQuestion.value.database_row;
                         const answer_data_usercolumn = userInfo.value.db_col.value;
-                        // alert (`upload to ${existing_row}, ${questiondata_column}`)
 
                         google.script.run.withSuccessHandler((response) => {
                             if (response.status === 'success') {
@@ -3306,8 +3321,9 @@
                                 };
                                 activeDate.value = active_DateList.value[active_DateList.value.length - 1]
 
+                                console.log(active_QuizQuestion.value)
                                 if (response.creator === userInfo.value.username.value) {
-                                    allowed_quiz_creation.value = true;
+                                    app_state_info.value.allowed_quiz_creation = true;
                                     one_time_run_tracker.value.updating_q_creator_access = true;
                                 }
 
@@ -3326,7 +3342,7 @@
                     // on mount
                     onMounted(() => {
 
-                        window.is_development_mode = false;
+                        window.is_development_mode = true;
 
                         if (window.is_development_mode) {
                             localStorage.setItem("creds", `{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"HG Vadiraj Tirth Pr","addr":"D3"},"email":{"value":"data4shivendra@gmail.com","addr":"E3"},"phone":{"value":7260869161,"addr":"F3"},"db_col":{"value":6,"addr":"G3"},"role_std":{"value":"admin,","addr":"H3"},"role":{"value":"admin,","addr":"I3"}}`)
@@ -3386,7 +3402,7 @@
                     return {
                         spinnerStatus,
                         userInfo,
-                        allowed_quiz_creation,
+                        app_state_info,
                         activeDate,
                         active_DateList, haveAnswered4,
                         active_QuizQuestion,
@@ -3411,15 +3427,9 @@
                 template: `
 <Spinner :is_active="spinnerStatus.showing" :display_text="spinnerStatus.text" />
 <!--<pre><code>{{ JSON.stringify(qnaDB, null, 2) }}</code></pre>-->
-
-<div v-if="Object.keys(userInfo).length>0" class="text-center py-3 bg-dark text-white fs-4 fw-bold rounded-pill border- border-success">
-        <span class="cursor-pointer user-select-none">
-        {{Object.keys(userInfo).length>0 ? 'Hare Krishna '+ userInfo.display_name.value : 'Please Login'}}
-        </span>
-    </div>
 <LoginHandler :is_edit_mode="is_creating_quiz"
     :allow_overlay="active_mode!=='attempt_active'"
-    :allowed_quiz_creation="allowed_quiz_creation"
+    :app_state_info="app_state_info"
     @update_user_creds="updateUserInfo"
     @spin="updateSpin"
     @create_quiz="updateQuizCreatingMode" />
