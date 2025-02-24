@@ -285,9 +285,10 @@
                         return username.value.trim().length > 0 && password.value.trim().length > 0
                     });
 
-                    const handleSubmit = () => {
+                    const handleSubmit = (do_quietly) => {
                         // user validation here
-                        emit('spin', { showing: true, text: 'loggin in' })
+                        mode = do_quietly ? 'passive' : 'active';
+                        emit('spin', { showing: true, text: 'loggin in', mode: mode })
                         // alert(`${username.value}, ${password.value}`)
 
                         google.script.run.withSuccessHandler((response) => {
@@ -299,36 +300,42 @@
                                 loginError.value = { haserror: false, msg: '' }
 
                                 // successfully logged in
-                                const user_credential = response.creds;
+                                const user_credential = {
+                                    ...response.creds,
+                                    is_latest: true
+                                };
 
                                 // Store the credentials
                                 localStorage.setItem('creds', JSON.stringify(user_credential));
                                 userCreds.value = user_credential;
 
-                                emit('spin', { showing: false, text: '' })
+                                emit('spin', { showing: false, text: '', mode: mode })
                             }
                             else if (response.status == 'failed') {
                                 // incorrect password
                                 password.value = '';
                                 loginError.value = { haserror: true, msg: 'incorrect password' }
+                                const user_credential = response.creds;
 
-                                emit('spin', { showing: false, text: '' })
+                                emit('spin', { showing: false, text: '', mode: mode })
                             }
                             else if (response.status === 'nouser') {
                                 // user does not exist
-                                emit('spin', { showing: false, text: '' })
+                                emit('spin', { showing: false, text: '', mode: mode })
 
                                 username.value = '';
                                 password.value = '';
                                 loginError.value = { haserror: true, msg: 'user does not exist' }
+                                const user_credential = response.creds;
                             }
                             else if (response.status === 'pending') {
                                 // user does not exist
-                                emit('spin', { showing: false, text: '' })
+                                emit('spin', { showing: false, text: '', mode: mode })
 
                                 username.value = '';
                                 password.value = '';
                                 loginError.value = { haserror: true, msg: 'your registration is in progress' }
+                                const user_credential = response.creds;
                             }
                         }).login_validateUserLogin(username.value, password.value);
 
@@ -399,7 +406,7 @@
 
                     const registerme = (regform) => {
 
-                        emit('spin', { showing: true, text: 'onboarding!!' })
+                        emit('spin', { showing: true, text: 'onboarding!!', mode: 'active' })
                         const payload = {
                             username: regforminput.value.username,
                             password: regforminput.value.password,
@@ -415,7 +422,7 @@
                             else if (status === 'success') {
                                 regforminput.value.showPopUp = true;
                                 regforminput.value.popupmsg = 'You have been registered! You will receive an email/WhatsApp after verification.';
-                                emit('spin', { showing: false, text: '' })
+                                emit('spin', { showing: false, text: '', mode: 'active' })
 
                                 // clear the form
                                 regforminput.value.username = ''
@@ -426,7 +433,7 @@
                             }
                             else if (status === 'failed') {
                                 alert('failed to register')
-                                emit('spin', { showing: false, text: '' })
+                                emit('spin', { showing: false, text: '', mode: 'active' })
                                 alert("unexpected error occurred!! :(")
                             }
 
@@ -437,7 +444,7 @@
                     const verifyUser = (username) => {
                         const userdata = db4_pending_users.value[username];
                         const display_name = reg_verification.value.display_name[username];
-                        emit('spin', { showing: true, text: `Verifying ${display_name}` })
+                        emit('spin', { showing: true, text: `Verifying ${display_name}`, mode: 'active' })
                         // alert(`${username}, ${display_name} ${userdata.display_name.addr}`)
 
                         // update the user-name
@@ -451,7 +458,7 @@
 
                             }
                             else if (response.status === 'failed') {
-                                emit('spin', { showing: false, text: '' })
+                                emit('spin', { showing: false, text: '', mode: 'active' })
                                 alert("unexpected error occurred!! :(")
                             }
                         }).login_modifyUserCreds(username, userdata.display_name.addr, display_name)
@@ -460,7 +467,7 @@
                     const fetch_existing_userdata = () => {
                         if (Object.keys(existing_users.value).length === 0) {
                             // fetch only if not fetched so far
-                            emit('spin', { showing: true, text: 'fetching registration form!!' })
+                            emit('spin', { showing: true, text: 'fetching registration form!!', mode: 'active' })
                             google.script.run.withSuccessHandler((response) => {
                                 existing_users.value = Object.values(response.data).reduce((acc, user) => {
                                     acc.username_list.push(user.username.value);
@@ -482,24 +489,37 @@
                     };
 
                     const fetch_pending_user_data = () => {
-                        emit('spin', { showing: true, text: 'fetching pending users' })
+                        emit('spin', { showing: true, text: 'fetching pending users', mode: 'passive' })
                         google.script.run.withSuccessHandler((response) => {
                             db4_pending_users.value = response.data;
                             Object.entries(db4_pending_users.value).forEach(([username, userdata]) => {
                                 reg_verification.value.expandeduser[username] = false;
                                 reg_verification.value.display_name[username] = '';
                             });
-                            emit('spin', { showing: false, text: '' })
+                            emit('spin', { showing: false, text: '', mode: 'passive' })
 
                         }).login_get_all_users(true)
                     }
 
 
                     onMounted(() => {
+                        // devops
+                        window.is_development_mode = false;
+                        if (window.is_development_mode) {
+                            localStorage.setItem("creds", `{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"HG Vadiraj Tirth Pr","addr":"D3"},"email":{"value":"data4shivendra@gmail.com","addr":"E3"},"phone":{"value":7260869161,"addr":"F3"},"db_col":{"value":6,"addr":"G3"},"role_std":{"value":"admin,","addr":"H3"},"role":{"value":"admin,","addr":"I3"}}`)
+                        }
                         const existingcredsraw = localStorage.getItem("creds")
                         if (existingcredsraw) {
                             // alert('found the user')
-                            userCreds.value = JSON.parse(existingcredsraw);
+                            userCreds.value = {
+                                ...JSON.parse(existingcredsraw),
+                                is_latest: false
+
+                            }
+                            username.value = userCreds.value.username.value
+                            password.value = userCreds.value.password.value
+                            // now silently update the credentials
+                            handleSubmit(true);
                         }
                         else {
                             // alert("user not found")
@@ -570,10 +590,10 @@
 <div v-if="user_is_verified">
     
     <div
-      class="text-center py-3 fs-4 fw-bold rounded-pill border border-success d-flex flex-column align-items-center justify-content-center"
+      class="text-center py-3 fs-4 fw-bold rounded-pill border d-flex flex-column align-items-center justify-content-center"
       :class="{
-        'bg-dark text-white': !app_state_info.is_updating_database,
-        'bg-secondary text-light': app_state_info.is_updating_database
+        'bg-dark text-white border-success border-2': !app_state_info.is_busy,
+        'bg-secondary text-light border-danger border-5': app_state_info.is_busy
       }"
       @click="toggleDetailsVisibility"
     style="cursor: pointer;"
@@ -582,11 +602,10 @@
       <span class="cursor-pointer user-select-none">
         {{ 'Hare Krishna ' + userCreds.display_name.value }}
       </span>
-
-      <!-- Spinner + "Updating DB..." text (Shown Below When Updating) -->
-      <div v-if="app_state_info.is_updating_database" class="d-flex gap-2 align-items-center mt-1">
+      
+      <div v-if="app_state_info.is_busy" class="d-flex gap-2 align-items-center mt-1">
         <div class="spinner-border spinner-border-sm text-light" role="status"></div>
-        <small>updating database...</small>
+        <small>{{app_state_info.busy_msg}}</small>
       </div>
     </div>
     
@@ -671,7 +690,7 @@
       <div class="card p-4">
         <h3 class="mb-4 text-center">Login</h3>
 
-        <form @submit.prevent="handleSubmit">
+        <form @submit.prevent="handleSubmit(false)">
           <div class="mb-3">
             <label for="username" class="form-label">Username</label>
             <input type="text" id="username" v-model="username" class="form-control" placeholder="Enter your username"
@@ -888,7 +907,7 @@
       `
             };
 
-            // MCQ
+            // multiple correct and single correct type questions
             const MCQ = {
                 props: {
                     // mode of component. edit, attempt, show
@@ -1212,7 +1231,8 @@
 </div>
 `
             };
-            // MCQ
+
+            // Correct the Order type question
             const CTO = {
                 props: {
                     // mode of component. edit, attempt, show
@@ -1568,6 +1588,8 @@
 </div>
 `
             };
+
+            // match the following type questiont
             const MTF = {
                 props: {
                     // mode of component. edit, attempt, show
@@ -2829,6 +2851,7 @@
 </div>            `
             };
 
+            // leaderboard
             const Leaderboard = {
                 components: {
                 },
@@ -3051,7 +3074,6 @@
             };
 
 
-
             // main app
             const app = Vue.createApp({
                 components: {
@@ -3067,33 +3089,182 @@
                     const one_time_run_tracker = ref({
                         updating_q_creator_access: false,
                     })
+
                     // page state related things
                     const is_creating_quiz = ref(false);
                     const active_mode = ref('attempt_show');
-                    const app_state_info = ref({
-                        allowed_quiz_creation: false,
-                        is_updating_database: true
-                    })
-
                     // attempt_show (show the quiz details)
                     // attempt_active (attempting the quiz details)
                     // show (see already answered quiz)
                     // db_daily (dashboard of the selected day)
+                    const app_state_info = ref({
+                        allowed_quiz_creation: false,
+
+                        is_busy: false,
+                        busy_msg: ""
+                    })
+
 
                     // userinfo and spinner
                     const userInfo = ref({});
 
                     const spinnerStatus = ref({
                         showing: false,
-                        text: "Just checking it out"
+                        text: ""
                     });
 
+                    // ----------------------------------------------------------
+                    // ------------------DATABASE RELATED------------------------
+                    const qnaDB = ref({
 
-                    // data base related things
-                    const qnaDB = ref({});
+                    }); // full database in app
 
-                    const activeDate = ref('');
+                    const activeDate = ref(''); // active date selected.
 
+                    // ----------------this is for client side storage
+                    const DB_NAME = "MyDatabase";
+                    const DB_STORE = "DataStore";
+                    const DB_VERSION = 1; // Change this to force a database reset
+
+                    // Open IndexedDB
+                    const openDB = async () => {
+                        return new Promise((resolve, reject) => {
+                            const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                            request.onupgradeneeded = (event) => {
+                                const db = event.target.result;
+                                // Delete all old object stores
+                                Array.from(db.objectStoreNames).forEach((store) => db.deleteObjectStore(store));
+                                // Create new object store
+                                db.createObjectStore(DB_STORE);
+                                console.log("Created new IndexedDB");
+                            };
+
+                            request.onsuccess = () => resolve(request.result);
+                            request.onerror = () => reject("Error opening IndexedDB");
+                        });
+                    };
+
+                    // Store full database object
+                    const store_db = async (active_db) => {
+                        const db = await openDB();
+                        return new Promise((resolve, reject) => {
+                            const transaction = db.transaction(DB_STORE, "readwrite");
+                            const store = transaction.objectStore(DB_STORE);
+                            store.put(active_db, "database"); // Store under a fixed key
+                            console.log("Saved to IndexedDB successfully");
+
+                            transaction.oncomplete = () => resolve("Database stored successfully");
+                            transaction.onerror = () => reject("Failed to store database");
+                        });
+                    };
+
+                    // Load full database object
+                    const load_database = async () => {
+                        const db = await openDB();
+                        return new Promise((resolve, reject) => {
+                            const transaction = db.transaction(DB_STORE, "readonly");
+                            const store = transaction.objectStore(DB_STORE);
+                            const request = store.get("database");
+
+                            request.onsuccess = () => {
+                                if (request.result) {
+                                    console.log("Loaded from IndexedDB");
+                                    resolve(request.result);
+                                } else {
+                                    resolve({}); // Return empty object if no database found
+                                }
+                            };
+
+                            request.onerror = () => reject("Failed to load database");
+                        });
+                    };
+
+
+
+                    const fetch_data_from_cloud = () => {
+
+                        updateSpin({
+                            mode: 'passive',
+                            showing: true,
+                            text: "updating database..."
+                        })
+                        google.script.run.withSuccessHandler((response) => {
+                            if (response.status === 'success') {
+                                qnaDB.value = response.fulldb;
+
+                                activeDate.value = active_DateList.value[active_DateList.value.length - 1]
+
+                                if (response.creator === userInfo.value.username.value) {
+                                    app_state_info.value.allowed_quiz_creation = true;
+                                }
+                                one_time_run_tracker.value.updating_q_creator_access = true;
+
+                                store_db(response.fulldb)
+
+                                updateSpin({
+                                    mode: 'passive',
+                                    showing: false,
+                                    text: ""
+                                })
+
+
+                            }
+                            else if (response.status == 'failed') {
+                                // some error  
+                                updateSpin({
+                                    mode: 'passive',
+                                    showing: true,
+                                    text: "some error occured. please refresh"
+                                })
+                            }
+                        }).qna_get_qnadb_2d();
+
+                    };
+
+                    const existing_usermap = ref({});
+                    const get_existing_usermap = () => {
+                        if (Object.keys(existing_usermap.value).length > 0 || window.is_development_mode) {
+                            // no need to fetch
+                        }
+                        else {
+                            // fetch from database
+
+
+                            updateSpin({
+                                mode: 'active',
+                                showing: true,
+                                text: "getting dashboard"
+                            })
+                            google.script.run.withSuccessHandler((response) => {
+                                existing_usermap.value = Object.entries(response.data)
+                                    .reduce((acc, [userId, data]) => {
+                                        acc[userId] = data.display_name.value;
+                                        return acc;
+                                    }, {});
+                                // response.data
+                                // .map(([username, userdata]) => {
+                                //   return {
+                                //     username: userdata.display_name.value
+                                //     }
+                                //   });
+
+
+                                updateSpin({
+                                    mode: 'active',
+                                    showing: false,
+                                    text: ""
+                                })
+                                // console.log(existing_usermap.value)
+
+                            }).login_get_all_users(false)
+                        }
+                    };
+
+                    // ------------------------------------------
+                    // ------------derived data from full data---
+
+                    // active quiz question
                     const active_QuizQuestion = computed(() => {
                         // console.log("--------------------------")
                         // console.log(qnaDB.value)
@@ -3114,7 +3285,7 @@
                         }
                     });
 
-
+                    // active quiz answer
                     const active_QuizAnswer = computed(() => {
                         if (Object.hasOwn(qnaDB.value, activeDate.value)) {
                             return {
@@ -3131,21 +3302,25 @@
 
                     });
 
+                    // whether a quiz is locked for editing
                     const quiz_is_locked = computed(() => {
                         return Object.values(active_QuizAnswer.value).some(user => user.status === "done");
-                    })
+                    });
 
+                    // list of dates
                     const active_DateList = computed(() => {
-                        return sortedDates = Object.keys(qnaDB.value).sort((a, b) => {
+                        return Object.keys(qnaDB.value).sort((a, b) => {
                             const numA = parseInt(a.split('|')[0], 10);
                             const numB = parseInt(b.split('|')[0], 10);
                             return numA - numB;  // Ascending order
                         });
-                    })
+                    });
 
+                    // date -> answered mapping for 
                     const haveAnswered4 = computed(() => {
                         const username = userInfo.value.username?.value;
                         const statusMap = {};
+
                         for (const date in qnaDB.value) {
                             statusMap[date] = qnaDB.value[date].answer_by_user[username].status;
                         }
@@ -3158,7 +3333,10 @@
                         return statusMap;
                     })
 
+
+                    //-------------------------------------------------------
                     // various handlers to respond to emits of components
+
                     const updateQuizCreatingMode = (new_value) => {
                         is_creating_quiz.value = new_value;
                     }
@@ -3166,18 +3344,20 @@
                     const updateUserInfo = (newuserinfo) => {
                         userInfo.value = newuserinfo;
 
-                        // fetch data only after login
+                        // to do list after login
                         if (Object.keys(userInfo.value).length > 0) {
-                            // console.log(window.is_development_mode);
-                            if (!window.is_development_mode) {
-                                fetch_data()
+                            if (userInfo.is_latest) {
+                                load_database().then((localdata) => {
+                                    qnaDB.value = localdata;
+                                    fetch_data_from_cloud();
+                                });
                             }
                         }
-                    }
+                    };
 
                     const updateActiveDate = (new_date) => {
                         activeDate.value = new_date;
-                    }
+                    };
 
                     const updateActiveQuiz = (updatedQuizQuestion) => {
                         const newly_created_quiz = JSON.parse(JSON.stringify(updatedQuizQuestion));
@@ -3185,34 +3365,15 @@
                             ...newly_created_quiz._metaData,
                             upload_time: new Date().toISOString(),
                             creator: userInfo.value
-                        }
+                        };
 
-                        // for development purpose
-                        if (window.is_development_mode) {
-
-                            qnaDB.value[activeDate.value] = {
-                                question_data: newly_created_quiz,
-                                answer_by_user: {},
-                                edit_row: 0
-                            }
-
-                            qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value] = {
-                                status: "pending",
-                            }
-
-
-                            console.log(qnaDB.value)
-                            alert('saved in development mode')
-                            return
-                        }
-
-
-                        // now submit the quiz
-                        spinnerStatus.value = {
+                        updateSpin({
+                            mode: 'active',
                             showing: true,
                             text: "submitting the quiz"
-                        };
-                        // alert("submitted")
+                        });
+
+
                         if (active_QuizQuestion.value.draft_exists) {
                             // modifying a quiz
 
@@ -3220,40 +3381,74 @@
 
                             google.script.run.withSuccessHandler((response) => {
                                 if (response.status === 'success') {
-                                    activeDate.value = null;
+
+                                    // update the local database
+                                    qnaDB.value[activeDate.value] = {
+                                        question_data: newly_created_quiz,
+                                        answer_by_user: {},
+                                        edit_row: 0
+                                    }
+                                    console.log(Object.keys(qnaDB.value))
+                                    qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value] = {
+                                        status: "pending",
+                                    }
+                                    updateSpin({
+                                        mode: 'active',
+                                        showing: false,
+                                        text: ""
+                                    });
+
                                     // reload the data
                                     setTimeout(() => {
-                                        fetch_data();
+                                        fetch_data_from_cloud();
                                     }, 500);
 
                                 }
                                 else if (response.status == 'failed') {
                                     // some error  
-                                    spinnerStatus.value = {
+                                    updateSpin({
+                                        mode: 'active',
                                         showing: false,
                                         text: ""
-                                    };
+                                    })
                                 }
                             }).qna_modify_quiz(JSON.stringify(newly_created_quiz), existing_row);
                         }
+
                         else {
                             // uploading a new quiz
                             google.script.run.withSuccessHandler((response) => {
                                 if (response.status === 'success') {
-                                    activeDate.value = null;
 
-                                    // reload the data
+                                    // update the local database
+                                    qnaDB.value[activeDate.value] = {
+                                        question_data: newly_created_quiz,
+                                        answer_by_user: {},
+                                        edit_row: 0
+                                    }
+                                    qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value] = {
+                                        status: "pending",
+                                    }
+                                    updateSpin({
+                                        mode: 'active',
+                                        showing: false,
+                                        text: ""
+                                    });
+
+
+                                    // reload the whole data
                                     setTimeout(() => {
-                                        fetch_data();
-                                    }, 500);
+                                        fetch_data_from_cloud();
+                                    }, 1000);
                                     // alert("successfully submitted")
                                 }
                                 else if (response.status == 'failed') {
                                     // some error  
-                                    spinnerStatus.value = {
+                                    updateSpin({
+                                        mode: 'active',
                                         showing: false,
                                         text: ""
-                                    };
+                                    })
                                 }
                             }).qna_upload_question(activeDate.value, JSON.stringify(newly_created_quiz));
 
@@ -3262,141 +3457,81 @@
 
                     const updateActiveRespose = (updatedQuizAnswer) => {
                         const quizAnswer = JSON.parse(JSON.stringify(updatedQuizAnswer));
-                        // console.log(quizAnswer)
 
-
-                        if (window.is_development_mode) {
-                            qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value] = {
-                                status: "done",
-                                ...quizAnswer,
-                            }
-                            active_mode.value = 'show';
-                            return
-                        }
-
-                        spinnerStatus.value = {
+                        updateSpin({
+                            mode: 'active',
                             showing: true,
                             text: "submitting your answers"
-                        };
+                        })
 
                         const existing_row = active_QuizQuestion.value.database_row;
                         const answer_data_usercolumn = userInfo.value.db_col.value;
 
                         google.script.run.withSuccessHandler((response) => {
                             if (response.status === 'success') {
-                                activeDate.value = null;
+
+                                // upon successful submission update the local data also
+                                // to have fast experience
+                                qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value] = {
+                                    status: "done",
+                                    ...quizAnswer,
+                                }
+                                active_mode.value = 'show';
+
+                                updateSpin({
+                                    mode: 'active',
+                                    showing: false,
+                                    text: ""
+                                })
                                 // reload the data
                                 setTimeout(() => {
-                                    fetch_data();
-                                }, 500);
+                                    fetch_data_from_cloud();
+                                }, 1000);
                                 active_mode.value = 'show'
 
                             }
                             else if (response.status == 'failed') {
                                 // some error  
-                                spinnerStatus.value = {
+                                updateSpin({
+                                    mode: 'active',
                                     showing: false,
                                     text: ""
-                                };
+                                })
                             }
                         }).qna_upload_to_cell(JSON.stringify(quizAnswer), existing_row, answer_data_usercolumn);
                     };
 
                     const updateSpin = (new_spin_status) => {
-                        spinnerStatus.value = new_spin_status;
-                    };
-
-                    const fetch_data = () => {
-
-                        spinnerStatus.value = {
-                            showing: true,
-                            text: "updating database..."
-                        };
-                        google.script.run.withSuccessHandler((response) => {
-                            if (response.status === 'success') {
-                                qnaDB.value = response.fulldb;
-                                spinnerStatus.value = {
-                                    showing: false,
-                                    text: ""
-                                };
-                                activeDate.value = active_DateList.value[active_DateList.value.length - 1]
-
-                                console.log(active_QuizQuestion.value)
-                                if (response.creator === userInfo.value.username.value) {
-                                    app_state_info.value.allowed_quiz_creation = true;
-                                    one_time_run_tracker.value.updating_q_creator_access = true;
-                                }
-
-                            }
-                            else if (response.status == 'failed') {
-                                // some error  
-                                spinnerStatus.value = {
-                                    showing: false,
-                                    text: ""
-                                };
-                            }
-                        }).qna_get_qnadb_2d();
-
+                        if (new_spin_status.mode === 'passive') {
+                            // update for top banner
+                            app_state_info.value.is_busy = new_spin_status.showing;
+                            app_state_info.value.busy_msg = new_spin_status.text;
+                        }
+                        else if (new_spin_status.mode === 'active') {
+                            spinnerStatus.value.showing = new_spin_status.showing;
+                            spinnerStatus.value.text = new_spin_status.text;
+                        }
                     };
 
                     // on mount
                     onMounted(() => {
 
-                        window.is_development_mode = true;
-
                         if (window.is_development_mode) {
-                            localStorage.setItem("creds", `{"username":{"value":"shiven","addr":"B3"},"password":{"value":"hari","addr":"C3"},"display_name":{"value":"HG Vadiraj Tirth Pr","addr":"D3"},"email":{"value":"data4shivendra@gmail.com","addr":"E3"},"phone":{"value":7260869161,"addr":"F3"},"db_col":{"value":6,"addr":"G3"},"role_std":{"value":"admin,","addr":"H3"},"role":{"value":"admin,","addr":"I3"}}`)
-                            qnaDB.value = sessionStorage.getItem('qnaDB') ? JSON.parse(sessionStorage.getItem('qnaDB')) : {};
+
+                            // qnaDB.value = sessionStorage.getItem('qnaDB') ? JSON.parse(sessionStorage.getItem('qnaDB')) : {};
 
 
-                            watch(
-                                () => qnaDB.value,
-                                (newVal) => {
-                                    // alert("qnaDB updated")
-                                    sessionStorage.setItem("qnaDB", JSON.stringify(newVal));
-                                },
-                                { deep: true } // Ensures nested properties are tracked
-                            );
+                            // watch(
+                            //     () => qnaDB.value,
+                            //     (newVal) => {
+                            //         // alert("qnaDB updated")
+                            //         sessionStorage.setItem("qnaDB", JSON.stringify(newVal));
+                            //     },
+                            //     { deep: true } // Ensures nested properties are tracked
+                            // );
                         }
 
                     });
-
-                    const existing_usermap = ref({});
-                    const get_existing_usermap = () => {
-                        if (Object.keys(existing_usermap.value).length > 0 || window.is_development_mode) {
-                            // no need to fetch
-                        }
-                        else {
-                            // fetch from database
-
-
-                            spinnerStatus.value = {
-                                showing: true,
-                                text: "getting dashboard"
-                            };
-                            google.script.run.withSuccessHandler((response) => {
-                                existing_usermap.value = Object.entries(response.data)
-                                    .reduce((acc, [userId, data]) => {
-                                        acc[userId] = data.display_name.value;
-                                        return acc;
-                                    }, {});
-                                // response.data
-                                // .map(([username, userdata]) => {
-                                //   return {
-                                //     username: userdata.display_name.value
-                                //     }
-                                //   });
-
-
-                                spinnerStatus.value = {
-                                    showing: false,
-                                    text: ""
-                                };
-                                // console.log(existing_usermap.value)
-
-                            }).login_get_all_users(false)
-                        }
-                    };
 
 
                     return {

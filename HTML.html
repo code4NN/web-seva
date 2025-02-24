@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vue 3 IndexedDB Demo</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+    <div id="app" class="container mt-4">
+        <h2>Vue 3 IndexedDB Demo</h2>
+        
+        <button @click="saveToDB" class="btn btn-success">Save Data to IndexedDB</button>
+        <button @click="loadFromDB" class="btn btn-primary">Load Data from IndexedDB</button>
+
+        <div class="mt-3 p-3 border border-2" :class="dbLoaded ? 'border-success' : 'border-danger'">
+            <h4>Database Content:</h4>
+            <pre>{{ dbContent }}</pre>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const DB_NAME = "MyDatabase";
+                const DB_STORE = "DataStore";
+                const DB_VERSION = 1; // Change this to reset the database
+                const dbContent = ref(null);
+                const dbLoaded = ref(false);
+
+                // Open IndexedDB
+                const openDB = async () => {
+                    return new Promise((resolve, reject) => {
+                        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                        request.onupgradeneeded = (event) => {
+                            const db = event.target.result;
+                            Array.from(db.objectStoreNames).forEach((store) => db.deleteObjectStore(store));
+                            db.createObjectStore(DB_STORE);
+                            console.log("Created new database");
+                        };
+
+                        request.onsuccess = () => resolve(request.result);
+                        request.onerror = () => reject("Error opening IndexedDB");
+                    });
+                };
+
+                // Store full database object
+                const store_db = async (active_db) => {
+                    const db = await openDB();
+                    return new Promise((resolve, reject) => {
+                        const transaction = db.transaction(DB_STORE, "readwrite");
+                        const store = transaction.objectStore(DB_STORE);
+                        store.put(active_db, "database");
+
+                        transaction.oncomplete = () => resolve("Database stored successfully");
+                        transaction.onerror = () => reject("Failed to store database");
+                    });
+                };
+
+                // Load database or fetch from cloud if missing
+                const load_database = async (fetch_data_from_cloud) => {
+                    const db = await openDB();
+                    return new Promise((resolve, reject) => {
+                        const transaction = db.transaction(DB_STORE, "readonly");
+                        const store = transaction.objectStore(DB_STORE);
+                        const request = store.get("database");
+
+                        request.onsuccess = async () => {
+                            if (request.result) {
+                                console.log("Loaded from IndexedDB");
+                                resolve(request.result);
+                            } else {
+                                console.log("Database missing, fetching...");
+                                const fetchedData = await fetch_data_from_cloud();
+                                await store_db(fetchedData);
+                                resolve(fetchedData);
+                            }
+                        };
+                        request.onerror = () => reject("Error loading database");
+                    });
+                };
+
+                // Simulated cloud fetch function
+                const fetch_data_from_cloud = async () => {
+                    return new Promise((resolve) => {
+                        setTimeout(() => {
+                            resolve({ message: "Fetched from cloud!", timestamp: new Date().toISOString() });
+                        }, 1000);
+                    });
+                };
+
+                // Save to IndexedDB
+                const saveToDB = async () => {
+                    const sampleData = { message: "Hello from IndexedDB!", timestamp: new Date().toISOString() };
+                    await store_db(sampleData);
+                    console.log("Data stored!");
+                };
+
+                // Load from IndexedDB
+                const loadFromDB = async () => {
+                    dbContent.value = await load_database(fetch_data_from_cloud);
+                    dbLoaded.value = true;
+                };
+
+                onMounted(() => {
+                    loadFromDB(); // Auto-load on startup
+                });
+
+                return { saveToDB, loadFromDB, dbContent, dbLoaded };
+            }
+        }).mount("#app");
+    </script>
+</body>
+</html>
