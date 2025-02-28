@@ -1,0 +1,4082 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>SPORT</title>
+    <!-- <script src="https://unpkg.com/vue@3"></script> -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script> -->
+
+    <!-- Global Styles -->
+    <style>
+        /* 🌟 Base Styles */
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #97c4f0;
+            margin: 0;
+            padding: 0;
+        }
+
+        .app-container {
+            max-width: 900px;
+            width: 95%;
+            margin: 20px auto;
+            padding: 20px;
+            background: #ecf4ca;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease-in-out;
+        }
+
+        @media (max-width: 820px) {
+            .app-container {
+                width: 100%;
+                margin: 0;
+                /* Remove margins for full width */
+                border-radius: 0;
+                /* Optional: Remove rounded corners for edge-to-edge look */
+            }
+        }
+
+        /* 🎨 Styling the whole question block */
+        .question-container {
+            border: solid #0e1f11;
+        }
+
+        /* 🏷️ Styling each option block */
+        .option-container {
+            border: solid #0e1f11;
+        }
+
+        /* 🖱️ Hover Effects */
+        .option-container:hover {
+            border-color: #007bff;
+            /* Highlight border on hover */
+            box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);
+            /* Light blue shadow */
+        }
+
+
+
+        /* this section covers about element/s addition or deletion */
+        /* Enter: When a new item is added */
+        .custom-transition-enter-active,
+        .custom-transition-leave-active {
+            transition: all 0.8s ease;
+        }
+
+        .custom-transition-enter-from {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+
+        .custom-transition-leave-to {
+            opacity: 0;
+            transform: scale(1.3);
+        }
+
+        .custom-transition-move {
+            transition: transform 0.8s ease;
+        }
+
+        /* this is for moving swapping options  */
+        .try_qna_swap-move {
+            transition: transform 0.4s ease-in-out;
+        }
+
+        .try_qna_swap-enter-active,
+        .try_qna_swap-leave-active {
+            transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+        }
+
+        .try_qna_swap-enter-from,
+        .try_qna_swap-leave-to {
+            opacity: 0;
+            transform: scale(0.9);
+        }
+
+        /* Animation etc for the spinner */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1050;
+            backdrop-filter: blur(5px);
+            /* Soft blur effect */
+        }
+
+        /* Centered spinner */
+        .spinner-container {
+            text-align: center;
+            animation: fadeIn 0.8s ease-in-out;
+        }
+
+        /* Spinner with both spinning & zoom-in-out effect */
+        .spinner-animated {
+            width: 4rem;
+            height: 4rem;
+            border-width: 5px;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Loading text animation */
+        .loading-text {
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-top: 1rem;
+            animation: textFade 1.5s infinite ease-in-out;
+        }
+
+        /* Keyframes for spinning effect */
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Keyframes for pulsating (zoom-in/out) effect
+        @keyframes pulseSpinner {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            50% {
+                transform: scale(1.3);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+        } */
+
+        /* Keyframes for text fade effect */
+        @keyframes textFade {
+            0% {
+                opacity: 0.5;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.5;
+            }
+        }
+
+        /* Keyframes for overall fade-in effect */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Prevent zooming on mobile input fields */
+        input,
+        textarea,
+        select {
+            font-size: 16px !important;
+            /* Ensures browsers don't zoom on focus */
+        }
+
+        /* Ensure proper responsiveness */
+        html,
+        body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+    </style>
+
+
+</head>
+
+<body>
+    <div id="app" class="app-container">
+
+        <script>
+            const { ref, onMounted, watch, computed, onUnmounted } = Vue;
+
+            // Spinner
+            const Spinner = {
+                props: {
+                    is_active: {
+                        type: Boolean,
+                        required: true
+                    },
+                    display_text: {
+                        type: String,
+                        required: true
+                    }
+                },
+                setup() {
+                },
+                template: `
+<div v-if="is_active" class="overlay">
+    <div class="spinner-container">
+      <!-- Spinner with both spinning & pulsating effect -->
+      <div class="spinner-border text-light spinner-animated" role="status"></div>
+      <p class="loading-text">{{ display_text }}</p>
+    </div>
+</div>
+                `
+            };
+
+            // LoginHandler
+            const LoginHandler = {
+                props: {
+                    is_edit_mode: {
+                        type: Boolean,
+                        required: true
+                    },
+                    allow_overlay: {
+                        type: Boolean,
+                        required: true
+                    },
+                    app_state_info: {
+                        type: Object,
+                        required: true
+                    }
+                },
+                emits: ['update_user_creds', 'create_quiz', 'spin'],
+                setup(props, { emit }) {
+                    const username = ref('');
+                    const password = ref('');
+                    const showPassword = ref(false);
+                    const loginError = ref({
+                        haserror: false, msg: ''
+                    })
+
+                    const showDetails = ref(false);
+
+                    const userCreds = ref({});
+                    watch(userCreds, (newValue, oldValue) => {
+                        emit('update_user_creds', userCreds.value)
+                    });
+
+                    const display_name_initial = computed(() => {
+                        // Trim spaces
+                        let trimmedName = userCreds.value.display_name?.value || "";
+
+                        // Remove "HG" at the start, if present
+                        if (trimmedName.startsWith("HG")) {
+                            trimmedName = trimmedName.slice(2).trim();
+                        }
+
+                        // Remove "Pr" at the end, if present
+                        if (trimmedName.endsWith("Pr")) {
+                            trimmedName = trimmedName.slice(0, -2).trim();
+                        }
+
+                        // Split into words and take the first letter of each
+                        return trimmedName.split(/\s+/).map(word => word[0]).join("").slice(0, 3);
+                    })
+
+                    const user_is_verified = computed(() => {
+                        return Object.keys(userCreds.value).length > 0
+                    })
+
+                    const togglePassword = () => {
+                        showPassword.value = !showPassword.value;
+                    };
+
+                    const toggleDetailsVisibility = () => {
+                        if (props.allow_overlay) {
+                            showDetails.value = !showDetails.value;
+                        }
+                    }
+
+                    const allowSubmit = computed(() => {
+
+                        return username.value === 'guest' ? false : username.value.trim().length > 0 && password.value.trim().length > 0
+                    });
+
+
+                    const handleSubmit = (do_quietly) => {
+                        // user validation here
+                        mode = do_quietly ? 'passive' : 'active';
+                        emit('spin', { showing: true, text: do_quietly ? 'loggin in...' : 'loggin in', mode: mode })
+                        // alert(`${username.value}, ${password.value}`)
+
+                        // for guest finish it here
+                        if (username.value === 'guest' && password.value === 'guest') {
+                            const guest_credentials = {
+                                username: { value: 'guest' },
+                                password: { value: 'guest' },
+                                display_name: { value: 'guest' },
+                                role: { value: 'guest, admin,' }
+                            };
+
+                            localStorage.setItem("user_creds", JSON.stringify({
+                                creds: guest_credentials,
+                                timestamp: Date.now(), // Current time in milliseconds
+                                version: props.app_state_info.app_version
+                            }));
+                            userCreds.value = guest_credentials;
+                            emit('spin', { showing: false, text: '', mode: mode })
+
+                            return;
+                        }
+
+                        google.script.run.withSuccessHandler((response) => {
+                            // console.log(response.status)
+                            if (response.status === 'success') {
+                                // clear the password etc
+                                username.value = '';
+                                password.value = '';
+                                loginError.value = { haserror: false, msg: '' }
+
+                                // successfully logged in
+                                const user_credential = {
+                                    ...response.creds,
+                                };
+
+                                // Store the credentials
+                                localStorage.setItem("user_creds", JSON.stringify({
+                                    creds: user_credential,
+                                    timestamp: Date.now(), // Current time in milliseconds
+                                    version: props.app_state_info.app_version
+                                }));
+                                userCreds.value = user_credential;
+
+                                emit('spin', { showing: false, text: '', mode: mode })
+                            }
+                            else if (response.status == 'failed') {
+                                // incorrect password
+                                password.value = '';
+                                loginError.value = { haserror: true, msg: 'incorrect password' }
+                                const user_credential = response.creds;
+
+                                emit('spin', { showing: false, text: '', mode: mode })
+                            }
+                            else if (response.status === 'nouser') {
+                                // user does not exist
+                                emit('spin', { showing: false, text: '', mode: mode })
+
+                                username.value = '';
+                                password.value = '';
+                                loginError.value = { haserror: true, msg: 'user does not exist' }
+                                const user_credential = response.creds;
+                            }
+                            else if (response.status === 'pending') {
+                                // user does not exist
+                                emit('spin', { showing: false, text: '', mode: mode })
+
+                                username.value = '';
+                                password.value = '';
+                                loginError.value = { haserror: true, msg: 'your registration is in progress' }
+                                const user_credential = response.creds;
+                            }
+                        }).login_validateUserLogin(username.value, password.value);
+
+
+                    };
+
+                    const logOut = () => {
+                        userCreds.value = {};
+                        localStorage.removeItem('user_creds');
+                        showDetails.value = false;
+
+                    };
+                    // ------------------------------------------------
+                    // -------------related to registration
+                    const existing_users = ref({});
+                    const db4_pending_users = ref({});
+                    const reg_verification = ref({
+                        expandeduser: {},
+                        display_name: {}
+                    })
+
+                    const regforminput = ref({
+                        open_reg_form: false,
+                        username: '',
+                        password: '',
+                        show_password: false,
+                        phone: '',
+                        email: '',
+                        showPopUp: false,
+                        popupmsg: '',
+                        admin_no: ''
+                    });
+                    const regformerrors = computed(() => {
+                        const errors = {};
+
+                        // **Username Validation**
+                        const username = regforminput.value.username;
+                        const usernameRegex = /^[a-zA-Z0-9]+$/; // Only letters and numbers
+                        if (!username) errors.username = "Username cannot be empty.";
+                        else if (username.trim().toLowerCase() === 'guest') errors.username = "guest is reserved keyword";
+                        else if (username.length < 5) errors.username = "Username must be at least 5 characters.";
+                        else if (!usernameRegex.test(username)) errors.username = "Username can only contain letters and numbers.";
+                        else if (existing_users.value.username_list.includes(username)) errors.username = "Username already taken.";
+
+                        // **Password Validation**
+                        const password = regforminput.value.password;
+                        if (!password) errors.password = "Password cannot be empty.";
+                        else if (password.length < 4) errors.password = "Password must be at least 4 characters.";
+                        else if (/\s/.test(password)) errors.password = "Password cannot contain spaces.";
+
+                        // **Phone Validation**
+                        const phone = regforminput.value.phone;
+                        if (!phone) errors.phone = "Phone number cannot be empty.";
+                        else if (!/^[1-9][0-9]{9}$/.test(phone)) errors.phone = "Phone number must be exactly 10 digits and cannot start with 0.";
+                        else if (existing_users.value.phone_number_list.includes(phone)) errors.phone = "Phone number already taken.";
+
+                        // **Email Validation**
+                        const email = regforminput.value.email;
+                        if (!email) errors.email = "Email cannot be empty.";
+                        else if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email)) errors.email = "Enter a valid Gmail address.";
+
+                        // **Overall Registration Validity**
+                        return {
+                            ...errors,
+                            allow_register: Object.keys(errors).length === 0 // true if no errors
+                        };
+
+                    })
+
+                    const registerme = (regform) => {
+
+                        emit('spin', { showing: true, text: 'onboarding!!', mode: 'active' })
+                        const payload = {
+                            username: regforminput.value.username,
+                            password: regforminput.value.password,
+                            display_name: 'pending',
+                            email: regforminput.value.email,
+                            phone: regforminput.value.phone
+                        }
+                        google.script.run.withSuccessHandler((respose) => {
+                            const status = respose.status
+                            if (status === 'missing') {
+                                alert('missing data')
+                            }
+                            else if (status === 'success') {
+                                regforminput.value.showPopUp = true;
+                                regforminput.value.popupmsg = 'You have been registered! You will receive an email/WhatsApp after verification.';
+                                emit('spin', { showing: false, text: '', mode: 'active' })
+
+                                // clear the form
+                                regforminput.value.username = ''
+                                regforminput.value.password = ''
+                                regforminput.value.phone = ''
+                                regforminput.value.email = ''
+                                alert("Success!! You will receive a confirmation on email/whatsapp")
+                            }
+                            else if (status === 'failed') {
+                                alert('failed to register')
+                                emit('spin', { showing: false, text: '', mode: 'active' })
+                                alert("unexpected error occurred!! :(")
+                            }
+
+                        }).login_new_registration(payload)
+
+                    };
+
+                    const verifyUser = (username) => {
+                        const userdata = db4_pending_users.value[username];
+                        const display_name = reg_verification.value.display_name[username];
+                        emit('spin', { showing: true, text: `Verifying ${display_name}`, mode: 'active' })
+                        // alert(`${username}, ${display_name} ${userdata.display_name.addr}`)
+
+                        // update the user-name
+                        google.script.run.withSuccessHandler((response) => {
+                            if (response.status === 'success') {
+                                // remove the user from pending list
+                                setTimeout(() => {
+                                    fetch_pending_user_data();
+                                }, 1000);
+
+                                emit('spin', { showing: false, text: '', mode: 'active' })
+
+                            }
+                            else if (response.status === 'failed') {
+                                emit('spin', { showing: false, text: '', mode: 'active' })
+                                alert("unexpected error occurred!! :(")
+                            }
+                        }).login_verifyUserCreds(username, userdata.display_name.addr, display_name)
+                    }
+
+                    const fetch_existing_userdata = () => {
+                        if (Object.keys(existing_users.value).length === 0) {
+                            // fetch only if not fetched so far
+                            emit('spin', { showing: true, text: 'fetching registration form!!', mode: 'active' })
+                            google.script.run.withSuccessHandler((response) => {
+                                existing_users.value = Object.values(response.data).reduce((acc, user) => {
+                                    acc.username_list.push(user.username.value);
+                                    acc.phone_number_list.push(user.phone.value);
+                                    acc.email_list.push(user.email.value);
+                                    return acc;
+                                }, { username_list: [], phone_number_list: [], email_list: [] });
+
+                                regforminput.value.admin_no = Object.values(response.data)
+                                    .filter(item => {
+                                        item.role.value.includes('admin,')
+                                    })
+
+                                emit('spin', { showing: false, text: '', mode: 'active' })
+
+                            }).login_get_all_users(false)
+                        }
+
+                    };
+
+                    const fetch_pending_user_data = () => {
+                        emit('spin', { showing: true, text: 'fetching pending users', mode: 'passive' })
+                        google.script.run.withSuccessHandler((response) => {
+                            db4_pending_users.value = response.data;
+                            Object.entries(db4_pending_users.value).forEach(([username, userdata]) => {
+                                reg_verification.value.expandeduser[username] = false;
+                                reg_verification.value.display_name[username] = '';
+                            });
+                            emit('spin', { showing: false, text: '', mode: 'passive' })
+
+                        }).login_get_all_users(true)
+                    }
+
+
+                    onMounted(() => {
+                        // devops
+
+                        const rawData = localStorage.getItem("user_creds");
+                        if (rawData) {
+                            try {
+                                const data = JSON.parse(rawData);
+                                const currentTime = Date.now();
+                                // console.log(data)
+
+                                // Check if version matches
+                                if (data.version !== props.app_state_info.app_version) {
+                                    console.warn("Stored credentials version mismatch. Deleting...");
+                                    localStorage.removeItem("user_creds");
+                                }
+
+                                // Check if timestamp is older than 48 hours 
+                                else if (currentTime - data.timestamp > 48 * 60 * 60 * 1000) {
+                                    console.warn("Stored credentials expired. Deleting...");
+                                    localStorage.removeItem("user_creds");
+
+                                    username.value = data.creds.username.value
+                                    password.value = data.creds.password.value
+                                    loginError.value = { haserror: true, msg: 'session expired, please login again' }
+                                }
+
+                                else {
+                                    data.timestamp = currentTime;
+                                    localStorage.setItem("user_creds", JSON.stringify(data));
+                                    userCreds.value = data.creds;
+                                }
+                            }
+                            catch (error) {
+                                console.error("Error parsing credentials:", error);
+                                localStorage.removeItem("user_creds");
+                            }
+                        }
+
+                    });
+
+                    const toggle_quiz_creation_mode = () => {
+                        emit('create_quiz', !props.is_edit_mode);
+                        showDetails.value = !showDetails.value;
+                    };
+
+                    const open_Whatsapp = (phone, msgtype) => {
+                        // let msg = "HareKrishna";
+                        // let waurl = `https://wa.me/91${'7260869161'}?text=${msg}`
+                        // console.log(waurl)
+                        // window.open('https://wa.me/'+regforminput.value.admin_no'+?text='+msg+'_blank');
+
+                        // if (msgtype==='form_filled'){
+                        //   // msg = encodeURIComponent(['Hare Krishna Prabhu',
+                        //   // 'PAMHO',
+                        //   // 'Could you please verify my account with this number'].join("\n"));
+                        //   msg = encodeURIComponent("Hare Krishna Pr")
+                        //   window.open(`https://api.whatsapp.com/send?phone=91${regforminput.value.admin_no}&text=${msg}`,'_BLANK');
+                        // }
+                        // else if (msgtype==='verified'){
+                        //   // msg = encodeURIComponent(['Hare Krishna Prabhu','PAMHO','Your account has been verified'].join("\n"));
+                        //   msg = encodeURIComponent("Hare Krishna Pr")
+                        //   window.open(`https://api.whatsapp.com/send?phone=91${phone}&text=${msg}`,'_BLANK');
+
+                        // }
+                    };
+
+
+                    return {
+                        username, password, showPassword,
+                        togglePassword,
+                        allowSubmit,
+                        handleSubmit,
+                        loginError,
+                        logOut,
+                        user_is_verified,
+                        toggle_quiz_creation_mode,
+                        userCreds,
+                        display_name_initial,
+                        showDetails,
+                        toggleDetailsVisibility,
+                        regformerrors,
+                        regforminput,
+                        registerme,
+                        db4_pending_users,
+                        reg_verification,
+                        fetch_existing_userdata,
+                        fetch_pending_user_data,
+                        verifyUser,
+                        open_Whatsapp
+                    };
+                },
+                template: `
+<div v-if="user_is_verified">
+    
+    <div
+      class="text-center py-3 fs-4 fw-bold rounded-pill border d-flex flex-column align-items-center justify-content-center"
+      :class="{
+        'bg-dark text-white border-success border-2': !app_state_info.is_busy,
+        'bg-secondary text-light border-danger border-5': app_state_info.is_busy
+      }"
+      @click="toggleDetailsVisibility"
+    style="cursor: pointer;"
+      >
+      <!-- Main Text -->
+      <span class="cursor-pointer user-select-none">
+        {{ app_state_info.is_guest_mode?'Welcome ':'Hare Krishna '}}{{userCreds.display_name.value}}
+      </span>
+      
+      <div v-if="is_edit_mode" class="d-flex gap-2 align-items-center mt-1">
+        <small>QUIZ CREATING MODE</small>
+      </div>
+      
+      <div v-if="app_state_info.is_busy" class="d-flex gap-2 align-items-center mt-1">
+        <div class="spinner-border spinner-border-sm text-light" role="status"></div>
+        <small>{{app_state_info.busy_msg}}</small>
+      </div>
+    </div>
+    
+
+
+  <div v-if="showDetails"
+    class="w-100 mt-3 p-4 bg-light border rounded shadow-sm"
+      style="max-height: 60vh; overflow-y: auto;">
+
+        <h4 class="text-center mb-3">About me</h4>
+
+        <div class="position-relative">
+            <!-- Toggle Edit mode (adjusted position) -->
+            <button v-if="userCreds.role.value.includes('admin,')||app_state_info.allowed_quiz_creation" class="btn btn-primary mt-4 mb-4" @click="toggle_quiz_creation_mode">
+            {{is_edit_mode?'quit Quiz Creation mode': 'Lets Create Quiz'}}
+            </button>
+
+            <!-- Close Button (adjusted position) 
+            <button @click="toggleDetailsVisibility"
+            class="btn-close border border-danger rounded-circle p-2 position-absolute top-0 start-100 translate-middle-x"
+            style="z-index: 1045;"></button> -->
+
+            <!-- Display User Credentials -->
+            <div v-for="(value, key) in userCreds" :key="key">
+            <p><strong>{{ key }}:</strong> {{ value.value }}</p>
+            </div>
+        </div>
+
+      <div v-if="userCreds.role.value.includes('admin,')">
+          <h4 class="text-center mb-3">Pending verification</h4>
+          <button v-if="Object.keys(db4_pending_users).length===0"
+          class="my-3 btn btn-primary"
+          @click="fetch_pending_user_data"
+          :disabled="app_state_info.is_guest_mode"
+          >{{app_state_info.is_guest_mode?'no pending verifications in guest mode':'get pending verifications'}}</button>
+
+          <div style="max-height: 60vh; overflow-y: auto; padding-right: 10px;">
+              <div v-for="(user, username) in db4_pending_users" :key="username" class="border rounded p-3 mb-3 bg-white">
+                  <!-- Always visible fields -->
+                  <div class="d-flex justify-content-between align-items-center">
+                  <p class="mb-0"><strong>Username:</strong> {{ user.username.value }}</p>
+                  <p class="mb-0"><strong>Phone:</strong> {{ user.phone.value }}</p>
+                  <button class="btn btn-sm btn-outline-primary"
+                      @click="reg_verification.expandeduser[username] = !reg_verification.expandeduser[username]">
+                      {{ reg_verification.expandeduser[username] ? "Hide" : "Show More" }}
+                  </button>
+                  </div>
+
+                  <!-- Expandable section -->
+                  <div v-if="reg_verification.expandeduser[username]" class="mt-2">
+                  <p><strong>Email:</strong> {{ user.email.value }}</p>
+                  <p><strong>Role:</strong> {{ user.role.value || '' }}</p>
+
+                  <!-- Input for Display Name -->
+                  <input v-model="reg_verification.display_name[username]" type="text" class="form-control mt-2"
+                      placeholder="Enter Display Name">
+                  <!--
+                  <button class="btn btn-primary my-2"
+                  @click="open_Whatsapp(user.phone.value,'verified')"
+                  >Convey b4 verifying </button> -->
+
+                  <!-- Verify Button -->
+                  <button class="btn mt-2 w-100"
+                      :disabled="reg_verification.display_name[username].trim().length<5"
+                      :class="reg_verification.display_name[username].trim().length<5?'btn-danger':'btn-success'"
+                      @click="verifyUser(username)">
+                      {{reg_verification.display_name[username].trim().length<5?'Cannot Verify':'Verify'}}
+                  </button>
+                  </div>
+              </div>
+          </div>
+        </div>
+
+        <button class="btn btn-danger mt-4" @click="logOut">Sign Out</button>
+
+        </div>
+
+
+
+</div>
+<div v-else-if="!regforminput.open_reg_form">
+  <div class="row justify-content-center">
+    <div class="col-lg-6">
+      <div class="card p-4">
+        <h3 class="mb-4 text-center">Login</h3>
+
+        <form @submit.prevent="handleSubmit(false)">
+          <div class="mb-3">
+            <label for="username" class="form-label">Username</label>
+            <input type="text" id="username" v-model="username" class="form-control" placeholder="Enter your username"
+              required />
+          </div>
+
+          <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <div class="input-group">
+              <input id="password" v-model="password" :type="showPassword ? 'text' : 'password'" class="form-control"
+                placeholder="Enter your password" required />
+              <button type="button" @click="togglePassword" class="btn btn-outline-secondary">
+                {{ showPassword ? 'Hide' : 'Show' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="d-flex flex-column justify-content-center">
+            <h5 v-if="loginError.haserror" class='text-danger justify-content-center'>{{loginError.msg}} </h5>
+            <button v-if="allowSubmit" type="submit" class="btn btn-primary">Submit</button>
+            <button v-else-if="username==='guest' && password==='guest'" type="submit" class="btn btn-warning" >Login as guest</button>
+            <button v-else type="submit" class="btn btn-danger" disabled="true">cannot submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <button class="my-2 btn btn-primary" @click="regforminput.open_reg_form=true;fetch_existing_userdata();">New registration</button>
+
+</div>
+
+<div v-else>
+  <div class="mt-5">
+    <button class="my-2 btn btn-success" @click="regforminput.open_reg_form=false">Return to login 🔙</button>
+
+    <div class="row justify-content-center shadow-lg p-4">
+      <div class="col-lg-6">
+        <div class="card p-4">
+          <h3 class="mb-4 text-center">Registeration form</h3>
+
+          <!--
+          <div v-if="regforminput.showPopUp"
+                class="alert alert-success text-center my-3 border border-success rounded p-3 shadow-lg"
+                @click="open_Whatsapp('admin','form_filled')"
+                style="cursor: pointer;">
+              {{ regforminput.popupmsg }}  
+              <br>
+              <strong class="text-primary">(Click to fasten verification)</strong>
+           </div>
+          -->
+
+          <!-- Username -->
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-control" v-model="regforminput.username" placeholder="Enter username" />
+            <small class="text-danger" v-if="regformerrors.username">{{ regformerrors.username }}</small>
+          </div>
+
+          <!-- Password -->
+          <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <div class="input-group">
+              <input v-model="regforminput.password" :type="regforminput.show_password ? 'text' : 'password'"
+                class="form-control" placeholder="Enter your password" required />
+              <button type="button" @click="regforminput.show_password=!regforminput.show_password"
+                class="btn btn-outline-secondary">
+                {{ regforminput.show_password ? 'Hide' : 'Show' }}
+              </button>
+            </div>
+            <small class="text-danger" v-if="regformerrors.password">{{ regformerrors.password }}</small>
+          </div>
+
+          <!-- Phone -->
+          <div class="mb-3">
+            <label class="form-label">Phone number</label>
+            <input type="number" class="form-control" v-model="regforminput.phone"
+              @input="regforminput.phone = String(regforminput.phone || '').replace(/\D/g, '')"
+              placeholder="Enter phone number" />
+            <small class="text-danger" v-if="regformerrors.phone">{{ regformerrors.phone }}</small>
+          </div>
+
+          <!-- Email -->
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" v-model="regforminput.email" placeholder="Enter gmail" />
+            <small class="text-danger" v-if="regformerrors.email">{{ regformerrors.email }}</small>
+          </div>
+
+          <!-- Register Button -->
+          <button class="btn w-100 fs-5 fw-bold" :class="regformerrors.allow_register ? 'btn-success' : 'btn-danger'"
+            :disabled="!regformerrors.allow_register" @click="registerme">
+            {{ regformerrors.allow_register ? 'Register' : 'Cannot Register' }}
+          </button>
+        </div>
+
+        <!-- Popup Message -->
+        
+      </div>
+    </div>
+  </div>
+
+</div>
+                `
+            };
+
+            // DateSelector Component
+            const DateSelector = {
+                props: {
+                    dateList: {
+                        type: Array,
+                        required: true
+                    },
+                    statusMap: {
+                        type: Object,
+                        required: true
+                    },
+                    activeDate: {
+                        type: String,
+                        required: true
+                    },
+                    app_state: {
+                        type: Object,
+                        required: true
+                    },
+                    showNewPicker: {
+                        type: Boolean,
+                        required: true
+                    }
+                },
+                emits: ['dateClicked'],
+                setup(props, { emit }) {
+
+                    const calendar_date = ref(null);
+
+                    const handleDateClicked = (date) => {
+                        emit('dateClicked', date);
+                    };
+
+                    const updateDate_from_calendar = (event) => {
+                        const new_date_value = event.target.value;
+
+                        // format the date in the id-format
+                        const formatDateAsID = (dateString) => {
+                            const now = new Date();
+                            const currentHours = String(now.getHours()).padStart(2, "0");
+                            const currentMinutes = String(now.getMinutes()).padStart(2, "0");
+                            const currentSeconds = String(now.getSeconds()).padStart(2, "0");
+
+                            // Append the time to the date string
+                            const dateTimeString = `${dateString}T${currentHours}:${currentMinutes}:${currentSeconds}`;
+                            const date = new Date(dateTimeString);
+
+                            const day = date.getDate();
+                            const year = date.getFullYear();
+                            const month = (date.getMonth() + 1).toString().padStart(2, "0");
+
+                            const monthName = date.toLocaleString('default', { month: 'short' });
+                            const dayName = date.toLocaleString('default', { weekday: 'short' });
+
+                            const timestamp = date.getTime();
+                            // Convert milliseconds to seconds (for sorting purposes)
+                            const secondsElapsed = Math.floor(timestamp / 1000);
+
+                            return `${secondsElapsed}|${year}-${month}-${day}|${monthName} ${day}, ${dayName}`
+                        }
+                        // console.log(`${new_date_value}-${formatDateAsID(new_date_value)}`)
+                        if (new_date_value) {
+                            emit('dateClicked', formatDateAsID(new_date_value));
+                        }
+                        else {
+                            emit('dateClicked', '');
+                        }
+                    };
+
+                    return {
+                        calendar_date,
+                        handleDateClicked,
+                        updateDate_from_calendar
+                    };
+                },
+                template: `
+<div>
+    <label class="small text-muted">Please select a date</label>
+    <div class="d-flex align-items-center border border-1 border-dark rounded p-2">
+        
+        <!-- Scrollable Date List -->
+       <div class="d-flex overflow-auto flex-grow-1 flex-wrap gap-2">
+            <button v-for="(date, index) in dateList" 
+            :key="index"
+            class="btn me-2 text-nowrap shadow-lg"
+            :class="{
+                'btn-success': statusMap[date]==='done',  // Green if answered
+                'btn-danger': statusMap[date]=='pending', // Red if not answered
+                'border border-4 border-info': activeDate === date, // Thicker border and larger text if selected
+            }"
+            @click="handleDateClicked(date)">
+                {{ date.split('|')[2] }}
+            </button>
+        </div>
+    </div>
+
+    <!-- Date Picker Button (Right-Aligned) -->
+    <div v-if="showNewPicker"
+    class="d-flex flex-column justify-content-center align-items-center"
+    >
+
+     <label for="dateInput">Pick a date</label>
+    <input type="date" id="dateInput" name="date_input"
+      class="form-control w-auto" 
+      style="background-color: inherit; padding: 5px; border: 1px solid #ccc;"
+      @change="updateDate_from_calendar" />
+    </div>
+
+
+
+</div>
+      `
+            };
+
+            // multiple correct and single correct type questions
+            const MCQ = {
+                props: {
+                    // mode of component. edit, attempt, show
+                    std_mode: {
+                        type: String,
+                        required: true
+                    },
+
+                    // this is for creating question
+                    std_questionCreationKey: {
+                        type: String
+                    },
+
+                    std_date_has_changed: {
+                        type: Boolean,
+                        required: true
+                    },
+                    // this is for editQuestion, attemptQuiz, reviewQuiz
+                    std_questionData: {
+                        type: Object
+                    },
+
+                    // this is for reviewQuiz
+                    std_answerData: {
+                        type: Object
+                    },
+                    std_app_state: {
+                        type: Object,
+                        required: true
+                    },
+                    is_scq: {
+                        type: Boolean,
+                        required: true
+                    }
+                },
+                emits: ['createdQuestion', 'attemptedQuestion'],
+                setup(props, { emit }) {
+
+                    const mcq_keys = ['mcq_title', 'mcq_optionList'];
+
+                    // for creating the question
+                    const questionTitle = ref('');
+                    const optionList = ref([
+                        { text: '', isCorrect: false },
+                        { text: '', isCorrect: false }
+                    ]);
+                    if (props.std_app_state.is_guest_mode) {
+
+                        questionTitle.value = 'Question title';
+                        optionList.value = [
+                            { text: 'option one', isCorrect: true },
+                            { text: 'option two', isCorrect: false }
+                        ];
+                    }
+
+                    const selectedOption = ref([]);
+                    const max_marks = computed(() => {
+                        return optionList.value.filter(option => option.isCorrect).length * (props.is_scq ? 1 : 2);
+                    })
+
+                    if (mcq_keys.every(key => key in props.std_questionData)) {
+                        // prefill with question data
+                        // create a copy
+                        const cloned_draft = JSON.parse(JSON.stringify(props.std_questionData));
+                        questionTitle.value = cloned_draft.mcq_title;
+                        optionList.value = cloned_draft.mcq_optionList;
+                    }
+                    // watch for changes in std_questionData
+                    watch(
+                        () => props.std_date_has_changed,
+                        (newVal) => {
+                            // alert("change detected")
+                            if (mcq_keys.every(key => key in props.std_questionData)) {
+                                const cloned_draft = JSON.parse(JSON.stringify(props.std_questionData))
+                                questionTitle.value = cloned_draft.mcq_title;
+                                optionList.value = cloned_draft.mcq_optionList;
+                            } else {
+                                questionTitle.value = "";
+                                optionList.value = [
+                                    { text: '', isCorrect: false },
+                                    { text: '', isCorrect: false }
+                                ];
+                            }
+                        },
+                        { deep: true } // Ensures nested properties are tracked
+                    );
+
+
+                    const validationErrors = computed(() => {
+
+                        const error_optionList = [];
+
+                        optionList.value.forEach(element => {
+                            if (element.text.trim().length > 0) {
+                                error_optionList.push("")
+                            }
+                            else {
+                                error_optionList.push("cannot be blank")
+                            }
+
+                        });
+                        // console.log(error_optionList.every(option => option.trim().length > 0))
+                        const correct_answer_validation = props.is_scq ? max_marks.value === 1 : max_marks.value > 0;
+                        const correct_answer_validation_msg = props.is_scq ? "Should have exactly one correct answer" : "Should have at least one correct answer";
+
+                        const is_valid = {
+                            questionTitle: questionTitle.value.trim().length > 0 ? "" : "cannot be blank",
+                            options: error_optionList,
+                            valid_overall: error_optionList.every(option => option.trim().length === 0) &&
+                                questionTitle.value.trim().length > 0 && correct_answer_validation
+                        }
+                        // update the parent about how is the question looking
+                        emit("createdQuestion", {
+                            _is_valid: is_valid.valid_overall,
+                            _max_marks: max_marks.value,
+                            mcq_title: questionTitle.value,
+                            mcq_optionList: optionList.value
+                        }
+                        )
+
+                        return {
+                            ...is_valid,
+                            errormsg_overall: is_valid.valid_overall ? "" : correct_answer_validation_msg
+                        }
+                    });
+
+                    // Function to add a new option
+                    const add_option = () => {
+                        optionList.value.push({ text: '', isCorrect: false });
+                    };
+
+                    // Function to remove an option
+                    const remove_option = (index) => {
+                        optionList.value.splice(index, 1);
+                    };
+
+                    // Function to toggle correct option
+                    const toggle_is_correct = (index) => {
+                        optionList.value[index].isCorrect = !optionList.value[index].isCorrect;
+                    };
+
+                    // -----------------for attempt mode
+                    const updateUserSelection = (answerIndex) => {
+                        // Toggle selection
+                        if (selectedOption.value.includes(answerIndex)) {
+                            if (!props.is_scq) {
+                                // for MCQ remove the option from selectedOption
+                                selectedOption.value = selectedOption.value.filter(index => index !== answerIndex);
+                            }
+                            // if it is SCQ and already selected then do nothing when clicked again
+                        } else {
+                            // for scq only one option can be selected
+                            if (props.is_scq) {
+                                selectedOption.value = [answerIndex];
+                            }
+                            else {
+                                // for mcq add the option to the value
+                                selectedOption.value.push(answerIndex);
+                            }
+
+                        }
+
+                        // Compute marks
+                        let obtained_marks = -1;
+                        if (selectedOption.value.length > 0) {
+                            obtained_marks = selectedOption.value.reduce((total, ans_index) => {
+                                if (props.is_scq) {
+
+                                    return total + (optionList.value[ans_index].isCorrect ? 1 : 0);
+                                }
+                                else {
+                                    return total + (optionList.value[ans_index].isCorrect ? 2 : -1);
+                                }
+                            }, 0);
+
+                        }
+                        emit('attemptedQuestion', {
+                            _have_answered: true,
+                            _mark_obtained: obtained_marks,
+                            selectedOptionIndices: [...selectedOption.value] // Send selected options as array
+                        });
+                    };
+
+
+                    onMounted(() => {
+                        // alert("mounted SCQ");
+                    })
+                    return {
+                        // used while creating the question
+                        questionTitle,
+                        optionList,
+                        max_marks,
+                        selectedOption,
+
+                        add_option, remove_option, toggle_is_correct,
+                        validationErrors,
+                        updateUserSelection
+
+                    };
+                },
+
+                template: `
+<div class="container my-4">
+
+    <div v-if="std_mode==='edit'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container"
+            :class="validationErrors.valid_overall ? 'bg-success-subtle' : 'bg-danger-subtle'">
+            
+            <p class="fw-bold text-muted">{{is_scq ? 'Single correct question' : 'Multiple correct question'}}</p>
+            <p class="fw-bold text-muted">{{is_scq ? 'marking scheme 1 for correct 0 for incorrect' : '+2 for each correct -1 for incorrect'}}</p>
+
+            <!-- Question Title -->
+            <div class="mb-4">
+                <!-- <label for="questionTitle" class="form-label fw-bold"></label>-->
+                <textarea id="questionTitle" v-model="questionTitle" class="form-control" rows="3"
+                    placeholder="Enter your question here..."></textarea>
+                <div v-if="validationErrors.questionTitle" class="text-danger">
+                    {{ validationErrors.questionTitle }}
+                </div>
+            </div>
+
+            <transition-group name="custom-transition" tag="div">
+                <!-- Option List -->
+                <div v-for="(option, index) in optionList" :key="'option_'+index"
+                    class="p-3 border-1 option-container rounded mb-2"
+                    :class="{'border border-5 border-success bg-success-subtle': option.isCorrect}">
+
+                    <!-- Option Input -->
+                    <div class="d-flex align-items-center gap-2">
+                        <label :for="'optionText' + index" class="form-label">{{ index + 1 }}.</label>
+                        <input :id="'optionText' + index" v-model="option.text" type="text" class="form-control mb-2" placeholder="Enter option text">
+                    </div>
+
+                    <div v-if="validationErrors.options[index]" class="text-danger">
+                        {{ validationErrors.options[index] }}
+                    </div>
+
+                    <!-- Buttons (Stacked on Mobile) -->
+                    <div class="d-flex flex-column flex-sm-row gap-2">
+                        <button class="btn btn-outline-success" @click="toggle_is_correct(index)">
+                            {{ option.isCorrect ? 'Mark incorrect' : 'Mark correct' }}
+                        </button>
+                        <button v-if="optionList.length > 2" class="btn btn-outline-danger" @click="remove_option(index)">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+
+            </transition-group>
+
+            <!-- Error for correct option selection  -->
+            <div v-if="!validationErrors.valid_overall" class="text-danger mt-2">
+                {{ validationErrors.errormsg_overall }}
+            </div>
+
+            <!-- Add Option Button -->
+            <button class="btn btn-outline-primary mt-3" @click="add_option">
+                Add Option
+            </button>
+        </div>
+    </div>
+
+    <div v-else-if="std_mode === 'attempt'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container"
+            :class="selectedOption.length > 0 ? 'bg-success-subtle' : 'bg-danger-subtle'">
+
+            <!-- Question Title (Read-Only) -->
+            <div class="mb-4 w-100">
+                <p class="fw-bold text-break">{{ questionTitle }}</p>
+            </div>
+
+            <!-- Option List -->
+            <div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
+                :class="{'border-warning bg-warning-subtle': selectedOption.includes(index)}"
+                style="cursor: pointer; !important"
+                @click="updateUserSelection(index)">
+                <!-- Selectable Options -->
+                <label class="form-check-label">
+                    {{ option.text }}
+                </label>
+            </div>
+            <!-- Error Message if No Option is Selected -->
+            <div v-if="selectedOption.length === 0" class="text-danger mt-2">
+                Please select at least one option.
+            </div>
+
+        </div>
+    </div>
+
+    <div v-else-if="std_mode==='show'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container"
+            :class="std_answerData._mark_obtained > 0 ? 'bg-success-subtle' : 'bg-danger-subtle'">
+
+            <!-- Question Title (Read-Only) -->
+            <div class="mb-4 w-100">
+                <p class="fw-bold text-break">{{ questionTitle }}</p>
+            </div>
+
+            <!-- Option List -->
+            <div v-for="(option, index) in optionList" :key="index" class="p-3 border-1 option-container rounded mb-2"
+                :class="[
+                        std_answerData.selectedOptionIndices.includes(index) ? 'bg-warning-subtle' : '',
+                        option.isCorrect ? 'border border-5 border-success rounded p-3' : ''
+                        ]"
+            style="cursor: pointer;"
+            >
+                <!-- Selectable Options -->
+                <label class="form-check-label">
+                {{ option.text }}
+                    <span v-if="std_answerData.selectedOptionIndices.includes(index)">
+                        (grading: {{ option.isCorrect ? '✅' + (is_scq ? '+1' : '+2') : '❌' + (is_scq ? '+0' : '-1') }})
+                    </span>
+                </label>
+
+            </div>
+            <div>
+                <p class="fw-bold text-muted">Marks Obtained: {{ std_answerData._mark_obtained }} / {{max_marks}}</p>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+`
+            };
+
+            // Correct the Order type question
+            const CTO = {
+                props: {
+                    // mode of component. edit, attempt, show
+                    std_mode: {
+                        type: String,
+                        required: true
+                    },
+
+                    // this is for creating question
+                    std_questionCreationKey: {
+                        type: String
+                    },
+
+                    std_date_has_changed: {
+                        type: Boolean,
+                        required: true
+                    },
+                    // this is for editQuestion, attemptQuiz, reviewQuiz
+                    std_questionData: {
+                        type: Object
+                    },
+                    std_app_state: {
+                        type: Object,
+                        required: true
+                    },
+
+                    // this is for reviewQuiz
+                    std_answerData: {
+                        type: Object
+                    }
+                },
+                emits: ['createdQuestion', 'attemptedQuestion'],
+                setup(props, { emit }) {
+
+                    // for creating the question
+                    const cto_keys = ['cto_title', 'cto_optionList', 'cto_display_order'];
+
+                    const questionTitle = ref('');
+                    const optionList = ref([
+                        { text: '' },
+                        { text: '' },
+                    ]);
+                    const display_order = ref([]);
+                    const attempt_active_option = ref(-1);
+                    // watch(
+                    //     () => display_order.value,
+                    //     (newVal) => {
+                    //         console.log(`cto- display order ${display_order.value}`)
+                    //     },
+                    //     { deep: true } // Ensures nested properties are tracked
+                    // );
+
+
+                    if (props.std_app_state.is_guest_mode) {
+
+                        questionTitle.value = 'Question title';
+                        optionList.value = [
+                            { text: 'first place' },
+                            { text: 'second place' }
+                        ];
+                    }
+
+                    const max_marks = computed(() => {
+                        return optionList.value.length;
+                    })
+
+                    if (cto_keys.every(key => key in props.std_questionData)) {
+                        // prefill with question data
+                        // create a copy
+                        const cloned_draft = JSON.parse(JSON.stringify(props.std_questionData));
+                        questionTitle.value = cloned_draft.cto_title;
+                        optionList.value = cloned_draft.cto_optionList;
+                        display_order.value = cloned_draft.cto_display_order;
+                        // console.log(`cto- prefilling display order ${display_order.value}`)
+                    }
+                    // watch for changes in std_questionData
+                    watch(
+                        () => props.std_date_has_changed,
+                        (newVal) => {
+                            // alert("change detected")
+                            if (cto_keys.every(key => key in props.std_questionData)) {
+                                const cloned_draft = JSON.parse(JSON.stringify(props.std_questionData))
+                                questionTitle.value = cloned_draft.cto_title;
+                                optionList.value = cloned_draft.cto_optionList;
+                                display_order.value = cloned_draft.cto_display_order;
+                                // console.log(`cto- updating display order ${display_order.value}`)
+                            } else {
+                                questionTitle.value = "";
+                                optionList.value = ref([
+                                    { text: '' },
+                                    { text: '' },
+                                ]);
+                                display_order.value = [];
+
+                            }
+                        },
+                        { deep: true } // Ensures nested properties are tracked
+                    );
+
+
+                    const validationErrors = computed(() => {
+
+                        const error_optionList = [];
+
+                        optionList.value.forEach(element => {
+                            if (element.text.trim().length > 0) {
+                                error_optionList.push("")
+                            }
+                            else {
+                                error_optionList.push("cannot be blank")
+                            }
+
+                        });
+                        // console.log(error_optionList.every(option => option.trim().length > 0))
+                        const correct_answer_validation = max_marks.value > 2;
+                        const correct_answer_validation_msg = "Should have at least three options";
+
+                        const is_valid = {
+                            questionTitle: questionTitle.value.trim().length > 0 ? "" : "cannot be blank",
+                            options: error_optionList,
+                            valid_overall: error_optionList.every(option => option.trim().length === 0) &&
+                                questionTitle.value.trim().length > 0 && correct_answer_validation
+                        }
+                        // update the parent about how is the question looking
+                        display_order.value = create_display_order(optionList.value.length);
+                        // console.log(display_order.value)
+                        emit("createdQuestion", {
+                            _is_valid: is_valid.valid_overall,
+                            _max_marks: max_marks.value,
+                            cto_title: questionTitle.value,
+                            cto_optionList: optionList.value,
+                            cto_display_order: display_order.value
+                        }
+                        )
+
+                        return {
+                            ...is_valid,
+                            errormsg_overall: is_valid.valid_overall ? "" : correct_answer_validation_msg
+                        }
+                    });
+
+                    // Function to add a new option
+                    const create_display_order = (n) => {
+                        // Create an array [0, 1, 2, ..., n-1]
+                        const array = Array.from({ length: n }, (_, i) => i);
+
+                        // Fisher-Yates shuffle
+                        for (let i = array.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [array[i], array[j]] = [array[j], array[i]]; // Swap elements
+                        }
+
+                        return array;
+                    }
+
+                    const add_option = () => {
+                        optionList.value.push({ text: '' });
+                    };
+
+                    // Function to remove an option
+                    const remove_option = (index) => {
+                        optionList.value.splice(index, 1);
+                    };
+
+                    // -----------------for attempt mode
+                    const swap_options = (option_index, moving_direction) => {
+                        // respond to user action
+                        if (moving_direction === 'up') {
+                            // moving direction is up
+                            if (option_index > 0) {
+                                // Swap the elements
+                                [display_order.value[option_index], display_order.value[option_index - 1]] = [display_order.value[option_index - 1], display_order.value[option_index]];
+                                attempt_active_option.value = option_index - 1;
+                            }
+                        }
+                        else {
+                            // moving direction is down
+                            if (option_index < display_order.value.length - 1) {
+                                // Swap the elements
+                                [display_order.value[option_index], display_order.value[option_index + 1]] = [display_order.value[option_index + 1], display_order.value[option_index]];
+                            }
+                        }
+
+                        // -----------------Compute marks
+                        let obtained_marks = 0;
+                        // console.log("-------------------------------")
+                        display_order.value.forEach((optionIndex, position) => {
+                            if (optionIndex === position) {
+                                obtained_marks = obtained_marks + 1; // +1 for each correctly placed option
+                            }
+                            // console.log(`${optionIndex} ${position} ${obtained_marks}`)
+                        });
+
+
+                        emit('attemptedQuestion', {
+                            _have_answered: true,
+                            _mark_obtained: obtained_marks,
+                            selected_display_order: [...display_order.value] // Send selected order as array
+                        });
+                    };
+
+
+                    onMounted(() => {
+                        // alert("mounted SCQ");
+                    })
+                    return {
+                        // used while creating the question
+                        questionTitle,
+                        optionList,
+                        max_marks,
+                        display_order,
+                        attempt_active_option,
+
+                        add_option, remove_option,
+                        validationErrors,
+                        swap_options
+                    };
+                },
+
+                template: `
+<div class="container my-4">
+
+    <div v-if="std_mode==='edit'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container"
+        :class="validationErrors.valid_overall ? 'bg-success-subtle' : 'bg-danger-subtle'">
+            
+            <p class="fw-bold text-muted">Correct the order type question</p>
+            <p class="fw-bold text-muted">while attempting options will be shuffled</p>
+            <p class="fw-bold text-muted"> +1 for bringing each option at correct position</p>
+            <p class="fw-bold text-muted"> no negative marking</p>
+        
+            <!-- Question Title -->
+            <div class="mb-4">
+                <!-- <label for="questionTitle" class="form-label fw-bold"></label>-->
+                <textarea id="questionTitle" v-model="questionTitle" class="form-control" rows="3"
+                    placeholder="Enter your question here..."></textarea>
+                <div v-if="validationErrors.questionTitle" class="text-danger">
+                    {{ validationErrors.questionTitle }}
+                </div>
+            </div>
+
+            <transition-group name="custom-transition" tag="div">
+                <!-- Option List -->
+               <div v-for="(option, index) in optionList" :key="'option_'+index"
+                    class="p-3 border-1 option-container rounded mb-2"
+                    >
+
+                    <!-- Option Input -->
+                    <div class="d-flex align-items-center gap-2">
+                        <label :for="'optionText' + index" class="form-label">{{ index + 1 }}.</label>
+                        <input :id="'optionText' + index" v-model="option.text" type="text" class="form-control mb-2" placeholder="Enter option text">
+                    </div>
+
+                    <div v-if="validationErrors.options[index]" class="text-danger">
+                        {{ validationErrors.options[index] }}
+                    </div>
+
+                    <!-- Buttons (Stacked on Mobile) -->
+                    <div class="d-flex flex-column flex-sm-row gap-2">
+                        <button v-if="optionList.length > 3" class="btn btn-outline-danger" @click="remove_option(index)">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            </transition-group>
+
+            <!-- Error for correct option selection  -->
+            <div v-if="!validationErrors.valid_overall" class="text-danger mt-2">
+                {{ validationErrors.errormsg_overall }}
+            </div>
+
+            <!-- Add Option Button -->
+            <button class="btn btn-outline-primary mt-3" @click="add_option">
+                Add Option
+            </button>
+        </div>
+    </div>
+
+    <div v-else-if="std_mode === 'attempt'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container bg-secondary-subtle">
+
+            <!-- Question Title (Read-Only) -->
+            <div class="mb-4 w-100">
+                <p class="fw-bold text-break">{{ questionTitle }}</p>
+            </div>
+
+            <!-- Option List -->
+             <transition-group name="try_qna_swap" tag="div" class="d-flex flex-column gap-3 w-100">
+                        <button v-for="(a_index, index) in display_order" :key="a_index"
+                        class="btn btn-outline-secondary fw-semibold px-4 py-2 border-2 rounded-pill w-100 w-sm-auto text-wrap"
+                        :class="index==attempt_active_option? 'border-3 border-warning':''"
+                        style="cursor: pointer; background-color: transparent !important; color: inherit !important;" 
+                        @click="swap_options(index, 'up')">
+
+                        <span class="me-2">{{ index + 1 }}.</span>
+                            {{ optionList[a_index].text }}
+                        </button>  
+            </transition-group>
+
+            <p class="mt-4 fw-bold text-muted">click on an option to move up</p>
+
+        </div>
+    </div>
+
+    <div v-else-if="std_mode==='show'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container bg-white-subtle"
+        >
+            <!-- Question Title (Read-Only) -->
+            <div class="mb-4 w-100">
+                <p class="fw-bold text-break">{{ questionTitle }}</p>
+            </div>
+            <!-- Option List -->
+            <div class="container mt-4">
+                    <!-- Responsive Table Wrapper -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                        <thead class="table-light">
+                            <tr>
+                             <th class="text-center">
+                                       <button class="btn btn-outline-dark border-3 border-info fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                            Correct Order
+                                        </button>
+                                    </th>
+                                    <th class="text-center">
+                                        <button class="btn btn-outline-dark border-3 border-info fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                           Chosen Order
+                                        </button>
+                                    </th>
+                                    <th class="align-middle text-center">
+                                        <button class="btn btn-outline-dark border-3 border-info fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                            grading
+                                        </button>
+                                    </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(user_index, actual_index) in std_answerData.selected_display_order" :key="user_index">
+                            <!-- Correct Order -->
+                        <td class="align-middle text-center">
+                                <button
+                                    class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto"
+                                    style="cursor: pointer;!important">
+                                   {{actual_index+1+'. '}}{{optionList[actual_index].text }}
+                                </button>
+                                </td>
+                                
+                            <!-- Chosen Order (Highlight green if correct) -->
+                        <td class="align-middle text-center">
+                                <button
+                                    class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto"
+                                    style="cursor: pointer;!important">
+                                       {{user_index+1+'. '}}{{ optionList[user_index].text }}
+                                </button>
+                            </td>
+
+                            <!-- Marks Column (+1 for correct, 0 for incorrect) -->
+                            <td class="align-middle text-center">
+                                {{user_index===actual_index? '✅ +1' : '❌ +0'}}
+                            </td>
+                            </tr>
+                        </tbody>
+                        </table>
+                    </div>
+                </div>
+            
+            <div>
+                <p class="fw-bold text-muted">Marks Obtained: {{ std_answerData._mark_obtained }} / {{max_marks}}</p>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+`
+            };
+
+            // match the following type questiont
+            const MTF = {
+                props: {
+                    // mode of component. edit, attempt, show
+                    std_mode: {
+                        type: String,
+                        required: true
+                    },
+
+                    // this is for creating question
+                    std_questionCreationKey: {
+                        type: String
+                    },
+
+                    std_date_has_changed: {
+                        type: Boolean,
+                        required: true
+                    },
+                    // this is for editQuestion, attemptQuiz, reviewQuiz
+                    std_questionData: {
+                        type: Object
+                    },
+
+                    std_app_state: {
+                        type: Object,
+                        required: true
+                    },
+                    // this is for reviewQuiz
+                    std_answerData: {
+                        type: Object
+                    }
+                },
+                emits: ['createdQuestion', 'attemptedQuestion'],
+                setup(props, { emit }) {
+
+                    // for creating the question
+                    const mtf_keys = ['mtf_title', 'mtf_optionList', 'mtf_display_order', 'mtf_headers'];
+
+                    const questionTitle = ref('');
+                    const optionList = ref([
+                        { left: '', right: '' },
+                        { left: '', right: '' },
+                    ]);
+                    const display_order = ref([]);
+                    const attempt_active_option = ref(-1);
+                    const attempt_animated_opacity = ref({});
+                    // watch(
+                    //     () => display_order.value,
+                    //     (newVal) => {
+                    //         console.log(`display order ${display_order.value}`)
+                    //     },
+                    //     { deep: true } // Ensures nested properties are tracked
+                    // );
+                    const table_headers = ref({ left: '', right: '' })
+
+                    if (props.std_app_state.is_guest_mode) {
+
+                        questionTitle.value = 'Question title';
+                        optionList.value = [
+                            { left: 'sun', right: 'sunshine' },
+                            { left: 'God', right: 'soul' },
+                        ];
+                        table_headers.value = { left: 'left', right: 'right' }
+                    }
+
+                    const max_marks = computed(() => {
+                        return optionList.value.length;
+                    })
+
+                    if (mtf_keys.every(key => key in props.std_questionData)) {
+                        // prefill with question data
+                        // create a copy
+                        const cloned_draft = JSON.parse(JSON.stringify(props.std_questionData));
+                        questionTitle.value = cloned_draft.mtf_title;
+                        optionList.value = cloned_draft.mtf_optionList;
+                        display_order.value = cloned_draft.mtf_display_order;
+                        table_headers.value = cloned_draft.mtf_headers;
+                        // console.log(`prefilling display order ${display_order.value}`)
+
+                    }
+                    // watch for changes in std_questionData
+                    watch(
+                        () => props.std_date_has_changed,
+                        (newVal) => {
+                            // alert("change detected")
+                            if (mtf_keys.every(key => key in props.std_questionData)) {
+                                const cloned_draft = JSON.parse(JSON.stringify(props.std_questionData))
+                                questionTitle.value = cloned_draft.mtf_title;
+                                optionList.value = cloned_draft.mtf_optionList;
+                                display_order.value = cloned_draft.mtf_display_order;
+                                table_headers.value = cloned_draft.mtf_headers;
+                                // console.log(`onchange of date display order ${display_order.value}`)
+                            } else {
+                                questionTitle.value = "";
+                                optionList.value = ref([
+                                    { left: '', right: '' },
+                                    { left: '', right: '' },
+                                ]);
+                                display_order.value = [];
+                                table_headers.value = { left: '', right: '' }
+
+                            }
+                        },
+                        { deep: true } // Ensures nested properties are tracked
+                    );
+
+
+                    const validationErrors = computed(() => {
+
+                        const header_error = {
+                            left: table_headers.value.left.trim().length > 0 ? '' : 'empty header',
+                            right: table_headers.value.right.trim().length > 0 ? '' : 'empty header'
+                        }
+
+                        const error_optionList = [];
+                        optionList.value.forEach(row => {
+                            error_optionList.push({
+                                left: row.left.trim().length > 0 ? '' : 'empty value',
+                                right: row.right.trim().length > 0 ? '' : 'empty value'
+                            })
+                        });
+
+                        const correct_answer_validation = max_marks.value > 2;
+                        const correct_answer_validation_msg = "Should have at least three entries";
+
+                        const is_valid = {
+                            questionTitle: questionTitle.value.trim().length > 0 ? "" : "empty question title",
+                            headers: header_error,
+                            options: error_optionList,
+                            valid_overall: error_optionList.every(row => {
+                                return row.left.trim().length === 0 && row.right.trim().length === 0
+                            }) &&
+                                questionTitle.value.trim().length > 0 && correct_answer_validation
+                                && header_error.left.trim().length === 0 && header_error.right.trim().length === 0
+                        }
+                        // update the parent about how is the question looking
+                        display_order.value = create_display_order(optionList.value.length);
+                        // console.log(display_order.value)
+                        emit("createdQuestion", {
+                            _is_valid: is_valid.valid_overall,
+                            _max_marks: max_marks.value,
+                            mtf_title: questionTitle.value,
+                            mtf_headers: table_headers.value,
+                            mtf_optionList: optionList.value,
+                            mtf_display_order: display_order.value
+                        }
+                        )
+
+                        return {
+                            ...is_valid,
+                            errormsg_overall: is_valid.valid_overall ? "" : correct_answer_validation_msg
+                        }
+                    });
+
+                    // Function to add a new option
+                    const create_display_order = (n) => {
+                        // Create an array [0, 1, 2, ..., n-1]
+                        const array = Array.from({ length: n }, (_, i) => i);
+
+                        // Fisher-Yates shuffle
+                        for (let i = array.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [array[i], array[j]] = [array[j], array[i]]; // Swap elements
+                        }
+
+                        return array;
+                    }
+
+                    const add_option = () => {
+                        optionList.value.push({ left: '', right: '' });
+                    };
+
+                    // Function to remove an option
+                    const remove_option = (index) => {
+                        optionList.value.splice(index, 1);
+                    };
+
+                    // -----------------for attempt mode
+                    const animateSwap = (currentIndex, aboveIndex) => {
+                        return new Promise((resolve) => {  // ✅ Wrap in Promise
+                            const steps = 64;
+                            const intervalTime = 8; // Total 0.5s animation
+                            let step = 0;
+                            attempt_active_option.value = currentIndex;
+
+                            const interval = setInterval(() => {
+                                step++;
+
+                                // First half: Shrinking
+                                if (step <= steps / 2) {
+                                    attempt_animated_opacity.value[currentIndex] = 1 - (step / steps);
+                                    attempt_animated_opacity.value[aboveIndex] = 1 - (step / steps);
+                                }
+
+                                // Swap elements at halfway point
+                                if (step === steps / 2) {
+                                    [display_order.value[currentIndex], display_order.value[aboveIndex]] =
+                                        [display_order.value[aboveIndex], display_order.value[currentIndex]];
+                                    attempt_active_option.value = aboveIndex;
+                                }
+
+                                // Second half: Growing back
+                                if (step > steps / 2) {
+                                    attempt_animated_opacity.value[currentIndex] = 0.5 + ((step - steps / 2) / (steps / 2)) * 0.5;
+                                    attempt_animated_opacity.value[aboveIndex] = 0.5 + ((step - steps / 2) / (steps / 2)) * 0.5;
+                                }
+
+                                // Stop animation after full duration
+                                if (step === steps) {
+                                    clearInterval(interval);
+                                    attempt_animated_opacity.value[currentIndex] = 1;
+                                    attempt_animated_opacity.value[aboveIndex] = 1;
+                                    attempt_active_option.value = aboveIndex;
+
+                                    resolve(); // ✅ Resolve Promise when animation completes
+                                }
+                            }, intervalTime);
+                        });
+                    };
+
+                    const swap_options = async (option_index, moving_direction) => {
+                        // respond to user action
+                        if (moving_direction === 'up') {
+                            // moving direction is up
+                            if (option_index > 0) {
+                                // Swap the elements
+                                await animateSwap(option_index, option_index - 1);
+                            }
+                        }
+                        // else {
+                        //     // moving direction is down
+                        //     if (option_index < display_order.value.length - 1) {
+                        //         // Swap the elements
+                        //         [display_order.value[option_index], display_order.value[option_index + 1]] = [display_order.value[option_index + 1], display_order.value[option_index]];
+                        //     }
+                        // }
+
+                        // -----------------Compute marks
+                        let obtained_marks = 0;
+                        // console.log("-------------------------------")
+                        display_order.value.forEach((optionIndex, position) => {
+                            if (optionIndex === position) {
+                                obtained_marks = obtained_marks + 1; // +1 for each correctly placed option
+                            }
+                            // console.log(`${optionIndex} ${position} ${obtained_marks}`)
+                        });
+
+
+                        emit('attemptedQuestion', {
+                            _have_answered: true,
+                            _mark_obtained: obtained_marks,
+                            selected_display_order: display_order.value // Send selected order as array
+                        });
+                    };
+
+
+                    onMounted(() => {
+                        // alert("mounted SCQ");
+                        // const ping = 
+                    })
+                    return {
+                        // used while creating the question
+                        questionTitle,
+                        table_headers,
+                        optionList,
+                        max_marks,
+                        display_order, attempt_active_option, attempt_animated_opacity,
+
+                        add_option, remove_option,
+                        validationErrors,
+                        swap_options
+                    };
+                },
+
+                template: `
+<div class="container my-4">
+    <!--{{display_order}}
+    {{std_answerData?.selected_display_order}}-->
+    <div v-if="std_mode==='edit'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container"
+        :class="validationErrors.valid_overall ? 'bg-success-subtle' : 'bg-danger-subtle'">
+            
+            <p class="fw-bold text-muted">Match the following type question</p>
+            <p class="fw-bold text-muted">while attempting options in the right will be shuffled</p>
+            <p class="fw-bold text-muted"> +1 for bringing each correct match</p>
+            <p class="fw-bold text-muted"> no negative marking</p>
+        
+            <!-- Question Title -->
+            <div class="mb-4">
+                <!-- <label for="questionTitle" class="form-label fw-bold"></label>-->
+                <textarea id="questionTitle" v-model="questionTitle" class="form-control" rows="3"
+                    placeholder="Enter your question here..."></textarea>
+                <div v-if="validationErrors.questionTitle" class="text-danger">
+                    {{ validationErrors.questionTitle }}
+                </div>
+            </div>
+                <div class="container mt-4 w-100">
+                    <!-- Responsive Table Wrapper -->
+                    <div class="table-responsive w-100">
+                        <table class="table table-bordered table-striped w-100">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">
+                                        <input v-model="table_headers.left" type="text" class="form-control border-3 border-info"
+                                            placeholder="Enter left header">
+                                        <div v-if="validationErrors.headers.left" class="text-danger small">
+                                            {{ validationErrors.headers.left }}
+                                        </div>
+                                    </th>
+                                    <th class="text-center">
+                                        <input v-model="table_headers.right" type="text" class="form-control border-3 border-info"
+                                            placeholder="Enter Right header">
+                                        <div v-if="validationErrors.headers.right" class="text-danger small">
+                                            {{ validationErrors.headers.right }}
+                                        </div>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(option, index) in optionList" :key="index">
+                                    <!-- Left Column -->
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <label :for="'optionText' + index" class="form-label">{{ index + 1 }}.</label>
+                                            <input :id="'optionText' + index" v-model="option.left" type="text" class="form-control" placeholder="enter text">
+                                        </div>
+                                        <div v-if="validationErrors.options[index].left" class="text-danger small">
+                                            {{validationErrors.options[index].left}}
+                                        </div>
+                                    </td>
+
+                                    <!-- Right Column -->
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <label :for="'optionText' + index" class="form-label">{{ String.fromCharCode(97 + index) }}.</label>
+                                            <input :id="'optionText' + index" v-model="option.right" type="text" class="form-control" placeholder="enter text">
+
+                                            <button v-if="optionList.length>3" class="btn btn-danger btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width: 24px; height: 24px; padding: 0; font-size: 14px;"
+                                                @click="remove_option(index)">
+                                                &times;
+                                            </button>
+
+                                        </div>
+                                        <div v-if="validationErrors.options[index].right" class="text-danger small">
+                                            {{validationErrors.options[index].right}}
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>          
+
+            <!-- Error for correct option selection  -->
+            <div v-if="!validationErrors.valid_overall" class="text-danger mt-2">
+                {{ validationErrors.errormsg_overall }}
+            </div>
+
+            <!-- Add Option Button -->
+            <button class="btn btn-outline-primary mt-3" @click="add_option">
+                Add Option
+            </button>
+        </div>
+    </div>
+
+    <div v-else-if="std_mode === 'attempt'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container bg-secondary-subtle">
+
+            <!-- Question Title (Read-Only) -->
+            <div class="mb-4 w-100">
+                <p class="fw-bold text-break">{{ questionTitle }}</p>
+            </div>
+                       
+            
+            <div class="container mt-4">
+                    <!-- Responsive Table Wrapper -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">
+                                        <button class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto border-3 border-info"
+                                        style="cursor: pointer; background-color: transparent !important; color: inherit !important;"
+                                        >
+                                            {{table_headers.left}}
+                                        </button>
+                                    </th>
+                                    <th class="text-center">
+                                        <button class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto border-3 border-info"
+                                        style="cursor: pointer; background-color: transparent !important; color: inherit !important;"
+                                        >
+                                            {{table_headers.right}}
+                                        </button>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                    <tr v-for="(a_index, index) in display_order" :key="a_index">
+                                        <!-- Left Column -->
+                                        <td class="align-middle text-center">
+                                                <span class="me-2">{{ index + 1 }}.</span>
+                                                {{ optionList[index].left }}
+                                        </td>
+
+
+                                        <!-- Right Column -->
+                                        <td class="align-middle text-center">
+
+                                            <button
+                                            class="btn btn-outline-secondary fw-semibold px-4 py-2 border-2 rounded-pill w-100 w-sm-auto text-wrap"
+                                            :class="index==attempt_active_option? 'border-3 border-warning':''"
+                                            style="cursor: pointer; background-color: transparent !important; color: inherit !important;" 
+                                            :style="{
+                                                    transform: attempt_animated_opacity[index] ? 'scale(' + attempt_animated_opacity[index] + ')' : 'scale(1)',
+                                                    opacity: attempt_animated_opacity[index] ? attempt_animated_opacity[index] : 1
+                                                    }"
+                                            @click="swap_options(index, 'up')"
+                                            >
+                                                {{optionList[a_index].right }}
+                                            </button>
+                                        </td>
+                                    </tr>
+                            </tbody>
+                        </table>
+
+                    </div>
+                </div> 
+                 <p class="text-muted">
+                <span class="fw-bold">{{ table_headers.left }}</span> are fixed, 
+                <span class="fw-bold">{{ table_headers.right }}</span> can be moved. Click on an option to move up.
+            </p>       
+
+        </div>
+    </div>
+
+    <div v-else-if="std_mode==='show'">
+        <!-- Question Container -->
+        <div class="p-4 border-2 rounded question-container bg-white-subtle">
+            <!-- Question Title (Read-Only) -->
+            <div class="mb-4 w-100">
+                <p class="fw-bold text-break">{{ questionTitle }}</p>
+            </div>
+            
+            <div class="container mt-4">
+                    <!-- Responsive Table Wrapper -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">
+                                       <button class="btn btn-outline-dark border-3 border-info fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                            {{table_headers.left}}
+                                        </button>
+                                    </th>
+                                    <th class="text-center">
+                                        <button class="btn btn-outline-dark border-3 border-info fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                            {{table_headers.right}}
+                                        </button>
+                                    </th>
+                                    <th class="align-middle text-center">
+                                        <button class="btn btn-outline-dark border-3 border-info fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                            grading
+                                        </button>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(a_index, index) in std_answerData.selected_display_order" :key="index">
+                                    <!-- Left Column -->
+                                    <td>
+
+                                        <div class="d-flex align-items-center gap-2">
+                                            <button class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto">
+                                                {{index+1+'. '}}{{ optionList[index].left }}
+                                            </button>
+                                        </div>
+                                        
+                                    </td>
+
+                                    <!-- Right Column -->
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <button class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm w-100 w-sm-auto"
+                                            >
+                                                {{String.fromCharCode(97 + a_index)+'. '}}{{ optionList[a_index].right }}
+                                            </button>
+                                        </div>
+                                    
+                                    </td>
+                                    <td class="text-center">
+                                         <div class="d-flex align-items-center gap-2">
+                                            <label :for="'metric_grading' + index" class="form-label">
+                                                {{index===a_index ? '✅ +1':'❌ 0'}}
+                                                {{index===a_index ? '':'' }}
+                                            </label>
+                                            
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>          
+
+            
+            <div>
+                <p class="fw-bold text-muted">Marks Obtained: {{ std_answerData._mark_obtained }} / {{max_marks}}</p>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+`
+            };
+
+            // Question wrapper component
+            const Qwrapper = {
+                // mode of component. edit, attempt, show
+                components: {
+                    MCQ,
+                    CTO,
+                    MTF
+                },
+                props: {
+
+                    std_qtype: {
+                        type: String,
+                        required: true
+                    },
+
+                    std_mode: {
+                        type: String,
+                        required: true
+                    },
+
+                    std_date_has_changed: {
+                        type: Boolean,
+                        required: true
+                    },
+
+                    // this is for creating question
+                    std_questionCreationKey: {
+                        type: String,
+                        default: "gadbad"
+                    },
+
+                    // this is for editQuestion, attemptQuiz, reviewQuiz
+                    std_questionData: {
+                        type: Object,
+                    },
+                    std_app_state: {
+                        type: Object,
+                        required: true
+                    },
+
+                    // this is for reviewQuiz
+                    std_answerData: {
+                        type: Object,
+                    }
+                },
+                emits: ['createdQuestion', 'attemptedQuestion'],
+                setup(props, { emit }) {
+
+                    const pass_createdQuestion = (data) => {
+                        emit('createdQuestion', data)
+                    };
+
+                    const pass_attemptedQuestion = (data) => {
+                        emit('attemptedQuestion', data)
+                    };
+                    onMounted(() => {
+                        // alert("mounted Q-wrapper");
+                    });
+
+                    return {
+                        pass_attemptedQuestion,
+                        pass_createdQuestion
+
+                    };
+                },
+                template:
+                    `
+<div>
+    <!-- check if question type is SCQ -->
+    <div v-if="std_qtype==='SCQ'">
+            <MCQ :std_mode="std_mode"
+                 :is_scq="true"
+                 :std_date_has_changed="std_date_has_changed"
+                 :std_questionCreationKey="std_questionCreationKey"
+                 :std_questionData="std_questionData"
+                 :std_answerData="std_answerData"
+                 :std_app_state="std_app_state"
+                 @attemptedQuestion="pass_attemptedQuestion"
+                 @createdQuestion="pass_createdQuestion"
+                />
+    </div>
+    <div v-else-if="std_qtype==='MCQ'">
+        <MCQ :std_mode="std_mode"
+             :is_scq="false"
+             :std_date_has_changed="std_date_has_changed"
+             :std_questionCreationKey="std_questionCreationKey"
+             :std_questionData="std_questionData"
+             :std_answerData="std_answerData"
+             :std_app_state="std_app_state"
+             @attemptedQuestion="pass_attemptedQuestion"
+             @createdQuestion="pass_createdQuestion"
+            />
+    </div>
+
+    <div v-else-if="std_qtype==='CTO'">
+        <CTO :std_mode="std_mode"
+             :std_date_has_changed="std_date_has_changed"
+             :std_questionCreationKey="std_questionCreationKey"
+             :std_questionData="std_questionData"
+             :std_answerData="std_answerData"
+             :std_app_state="std_app_state"
+             @attemptedQuestion="pass_attemptedQuestion"
+             @createdQuestion="pass_createdQuestion"
+            />
+    </div>
+
+    <div v-else-if="std_qtype==='MTF'">
+        <MTF :std_mode="std_mode"
+             :std_date_has_changed="std_date_has_changed"
+             :std_questionCreationKey="std_questionCreationKey"
+             :std_questionData="std_questionData"
+             :std_answerData="std_answerData"
+             :std_app_state="std_app_state"
+             @attemptedQuestion="pass_attemptedQuestion"
+             @createdQuestion="pass_createdQuestion"
+            />
+    </div>
+</div>
+               `
+
+            };
+
+            // Create Quiz component
+            const createQuiz = {
+                components: {
+                    Qwrapper
+                },
+                props: {
+                    active_date: {
+                        type: String,
+                        required: true
+                    },
+                    quizDraftData: {
+                        type: Object,
+                        required: true
+                    },
+                    app_state: {
+                        type: Object,
+                        required: true
+                    },
+                    is_locked: {
+                        type: Boolean,
+                        required: true
+                    }
+                },
+                emits: ['newQuizCreated'],
+                setup(props, { emit }) {
+
+                    const draft_exists = ref(false);
+                    const date_has_changed = ref(true);
+
+
+                    const default_QM = {
+                        question: {
+                            Q1: {
+                                _id: 'Q1',
+                                _qtype: 'SCQ',
+                                _qdata: {},
+                                _is_valid: false
+                            }
+                        },
+                        meta: {
+                            reference_section: props.app_state.is_guest_mode ? "suitable Quiz title" : "",
+                            is_active: false,
+                        }
+                    }
+
+                    // state managers for createQuiz
+                    const questions = ref({});
+
+                    const metadata_about_quiz = ref({});
+
+                    const reset_creation_to_default = () => {
+                        questions.value = JSON.parse(JSON.stringify(default_QM.question));
+                        metadata_about_quiz.value = JSON.parse(JSON.stringify(default_QM.meta));
+                    }
+
+                    // ---------------------------------------------------------------
+                    // if draft exists the pre-fill it with the quizDraftData
+                    if (props.quizDraftData.draft_exists) {
+                        const cloned_draft = JSON.parse(JSON.stringify(props.quizDraftData.draft))
+                        questions.value = cloned_draft._qData;
+                        metadata_about_quiz.value = cloned_draft._metaData;
+                        draft_exists.value = true;
+                    }
+                    else {
+                        reset_creation_to_default();
+                        draft_exists.value = false;
+                    }
+
+                    // Watch for changes in quizDraftData
+                    watch(
+                        () => props.active_date,
+                        (newVal) => {
+                            date_has_changed.value = true;
+                            // update the draftData
+                            if (props.quizDraftData.draft_exists) {
+                                const cloned_draft = JSON.parse(JSON.stringify(props.quizDraftData.draft))
+                                questions.value = cloned_draft._qData;
+                                metadata_about_quiz.value = cloned_draft._metaData;
+                                draft_exists.value = true;
+                            } else {
+                                reset_creation_to_default();
+                                draft_exists.value = false;
+                            }
+                        },
+                        { deep: true } // Ensures nested properties are tracked
+                    );
+
+
+                    // -------------------------now various handlers
+
+                    // Compute if all questions are valid
+                    const isValidQuiz = computed(() => {
+                        const metada_is_valid = metadata_about_quiz.value.reference_section.trim().length > 0;
+
+                        return Object.values(questions.value).every(q => q._is_valid) && metada_is_valid
+                    });
+
+                    const total_marks = computed(() => {
+                        return Object.values(questions.value).reduce((total, question) => {
+                            return total + question._qdata._max_marks;
+                        }, 0)
+                    });
+
+                    // Function to find the next question key (Q1, Q2, Q3...)
+                    const getNextQuestionKey = () => {
+                        const keys = Object.keys(questions.value).map(k => parseInt(k.substring(1))); // Extract numbers
+                        const maxKey = Math.max(...keys);
+                        return `Q${maxKey + 1}`;
+                    };
+
+                    // Add new question
+                    const addQuestion = () => {
+                        const newKey = getNextQuestionKey();
+                        questions.value[newKey] = JSON.parse(JSON.stringify(default_QM.question))['Q1']
+                        questions.value[newKey]['_id'] = newKey;
+                    };
+
+                    // Remove a question
+                    const removeQuestion = (key) => {
+                        delete questions.value[key];
+                    };
+
+                    // Update question data received from Qwrapper
+                    const updateQuestion = (key, qdata) => {
+                        questions.value[key]._qdata = qdata;
+                        questions.value[key]._is_valid = qdata._is_valid;
+                        date_has_changed.value = false;
+                    };
+
+                    const submitQuiz = () => {
+
+                        emit('newQuizCreated', {
+                            _qData: questions.value,
+                            _metaData: {
+                                ...metadata_about_quiz.value
+                            },
+                            _is_valid: isValidQuiz.value
+                        })
+
+                        reset_creation_to_default();
+                    };
+
+                    onMounted(() => {
+                        // alert("create Quiz mounted")
+                    });
+
+                    return {
+
+                        date_has_changed,
+                        draft_exists,
+                        metadata_about_quiz,
+                        questions,
+                        total_marks,
+
+                        isValidQuiz,
+
+                        addQuestion,
+                        getNextQuestionKey,
+                        removeQuestion,
+                        updateQuestion,
+
+                        submitQuiz
+                    };
+                },
+
+                template: `
+<div>
+   <!-- <div class="d-flex">
+        <div>
+<pre><code>{{ JSON.stringify(quizDraftData.draft._qData, null, 2) }}</code></pre>
+</div>
+<div> 
+    <pre><code>{{ JSON.stringify(questions, null, 2) }}</code></pre>
+    </div>
+</div> -->
+    <!-- get the source reference (title) of the quiz -->
+    <div class="d-flex flex-column justify-content-center align-items-center px-3">
+
+        <!-- get the quiz source section name -->
+        <label for="sbInput" class="form-label fs-5 mb-2 text-center">Enter quiz title</label>
+        <div class="w-100 w-sm-75 w-md-50 w-lg-40">
+            <input type="text" id="sbInput" class="form-control text-wrap p-2" placeholder="Enter text here..."
+                style="white-space: normal; word-wrap: break-word;" v-model="metadata_about_quiz.reference_section">
+        </div>
+        <div v-if="metadata_about_quiz.reference_section.trim().length==0" class="text-danger">
+            Please enter the reference SB section
+        </div>
+
+    </div>
+
+
+
+    <!-- Questions List -->
+    <transition-group name="custom-transition" tag="div">
+        <div v-for="(question, key) in questions" :key="key">
+            <hr class="my-4 border border-1 border-dark opacity-75" />
+
+            <!-- Question Type Selection (Flex Row) -->
+            <div class="mb-2 d-flex align-items-center"
+                 :class="{'flex-wrap gap-2': app_state.is_mobile}">
+
+                <!-- Leftmost "Q" Display in Red Circle -->
+                <div
+                    class="d-flex align-items-center justify-content-center fs-5 border border-danger rounded-circle p-2 me-3">
+                    {{key}}
+                </div>
+
+                <!-- Centered Buttons -->
+                <div class="d-flex justify-content-center gap-3 flex-grow-1 text-center">
+                    <button :class="['btn', question._qtype === 'SCQ' ? 'btn-primary' : 'btn-outline-primary']"
+                        @click="questions[key]._qtype = 'SCQ'">
+                        SCQ
+                    </button>
+
+                    <button :class="['btn', question._qtype === 'MCQ' ? 'btn-primary' : 'btn-outline-primary']"
+                        @click="questions[key]._qtype = 'MCQ'">
+                        MCQ
+                    </button>
+
+                    <button :class="['btn', question._qtype === 'CTO' ? 'btn-primary' : 'btn-outline-primary']"
+                        @click="questions[key]._qtype = 'CTO'">
+                        CTO
+                    </button>
+
+                    <button :class="['btn', question._qtype === 'MTF' ? 'btn-primary' : 'btn-outline-primary']"
+                        @click="questions[key]._qtype = 'MTF'">
+                        MTF
+                    </button>
+                </div>
+
+                <!-- Right-Aligned Close Button -->
+                <button v-if="Object.keys(questions).length > 1" type="button"
+                    class="btn-close ms-auto fs-5 border border-danger rounded-circle p-2 shadow-sm" aria-label="Close"
+                    @click="removeQuestion(key)">
+                </button>
+
+            </div>
+
+
+            <!-- Render Question Component-->
+            <Qwrapper
+                    :std_qtype="question._qtype"
+                    :std_mode="'edit'"
+                    :std_date_has_changed="date_has_changed"
+                    :std_questionData="question._qdata"
+                    :std_questionCreationKey="key"
+                    :std_app_state="app_state"
+                    @createdQuestion="updateQuestion(key,$event)"
+                    />
+
+        </div>
+
+        <!-- Add New Question -->
+        <div class="d-flex" key="add_new_question">
+            <button class="btn btn-success mt-3" @click="addQuestion">
+                ➕ Add {{getNextQuestionKey()}}
+            </button>
+        </div>
+    </transition-group>
+    <hr class="my-4 border border-1 border-dark opacity-75" />
+
+    <!-- Submit button  -->
+    <div class="d-flex flex-column align-items-center ">
+        <p class="fw-bold text-muted">Total obtainable Marks: {{ total_marks }}</p>
+
+         <button 
+            class="mt-3 align-self-start"
+            :class="metadata_about_quiz.is_active ? 'btn btn-success' : 'btn btn-danger'"
+            @click="metadata_about_quiz.is_active=!metadata_about_quiz.is_active"
+        >
+            {{ metadata_about_quiz.is_active ? "Save and launch (quiz can be attempted)" : "Saving as draft (quiz cannot be attempted)" }}
+        </button>
+
+
+        <button v-if="!isValidQuiz"
+        class="btn btn-danger mt-3 flex-grow-1 w-auto" disabled="true">
+            Cannot submit
+        </button>
+        <button v-else-if="is_locked"
+        class="btn btn-danger mt-3 flex-grow-1 w-auto" disabled="true">
+        Already answered by some
+        </button>
+        <button v-else class="btn btn-success mt-3 flex-grow-1 w-auto" @click="submitQuiz">
+            Submit Questions
+        </button>
+    </div>
+
+</div>
+`
+            };
+
+            // attempt Quiz
+            const attemptQuiz = {
+                components: {
+                    Qwrapper
+                },
+                props: {
+                    active_mode: {
+                        type: String,
+                        required: true
+                    },
+                    active_date: {
+                        type: String,
+                        required: true
+                    },
+
+                    quizQuestionData: {
+                        type: Object,
+                        required: true
+                    },
+                    app_state: {
+                        type: Object,
+                        required: true
+                    },
+
+                    quizMetaData: {
+                        type: Object,
+                        required: true,
+                    },
+                },
+                emits: ['quizAttempted', 'toggleAttemptNow'],
+                setup(props, { emit }) {
+
+                    const quizResponse = ref({});
+                    // pre-fill this with quizQuestionData which will be synced from Question components
+                    Object.keys(props.quizQuestionData).forEach((key) => {
+                        quizResponse.value[key] = {
+                            _answerData: {},
+                            _have_answered: false,
+                            _mark_obtained: 0,
+                        }
+                    });
+                    const date_has_changed = ref(true);
+                    // watch the change of date and update the data accordingly
+                    watch(
+                        () => props.active_date,
+                        (newVal) => {
+                            quizResponse.value = {};
+                            Object.keys(props.quizQuestionData).forEach((key) => {
+                                quizResponse.value[key] = {
+                                    _answerData: {},
+                                    _have_answered: false,
+                                    _mark_obtained: 0,
+                                }
+                            });
+                            date_has_changed.value = true;
+                            time_elapsed_since_upload_seconds.value = getElapsedSeconds(props.quizMetaData.upload_time);
+
+                        },
+                        { deep: true } // Ensures nested properties are tracked
+                    );
+
+                    // ----------------------------------------------
+                    // ---------------related to timers etc
+                    const getElapsedSeconds = (utcString) => {
+                        const pastTime = new Date(utcString).getTime(); // Convert UTC string to timestamp
+                        const currentTime = Date.now(); // Get current timestamp in milliseconds
+                        return Math.floor((currentTime - pastTime) / 1000); // Convert to seconds
+                    }
+
+                    const time_elapsed_since_upload_ID = ref(null);
+                    const time_elapsed_since_upload_seconds = ref(0);
+                    const time_elapsed_since_upload_display = computed(() => {
+                        const days = Math.floor(time_elapsed_since_upload_seconds.value / 86400);
+                        const hours = Math.floor((time_elapsed_since_upload_seconds.value % 86400) / 3600);
+                        const minutes = Math.floor((time_elapsed_since_upload_seconds.value % 3600) / 60);
+                        const secs = time_elapsed_since_upload_seconds.value % 60;
+
+                        let parts = [];
+
+                        if (days > 0) parts.push(`${days}d`);
+                        if (hours > 0) parts.push(`${String(hours).padStart(2, '0')}h`);
+                        if (minutes > 0) parts.push(`${String(minutes).padStart(2, '0')}m`);
+
+                        // Always show seconds
+                        parts.push(`${String(secs).padStart(2, '0')}s`);
+
+                        return parts.join(" ");
+
+                    });
+
+                    const time_elapsed_since_start_ID = ref(null);
+                    const time_elapsed_since_start_seconds = ref(0);
+
+                    const time_elapsed_since_start_display = computed(() => {
+                        const minutes = Math.floor(time_elapsed_since_start_seconds.value / 60);
+                        const secs = time_elapsed_since_start_seconds.value % 60;
+                        if (minutes === 0) {
+                            return `${secs}`
+                        }
+                        else {
+                            if (secs % 2 === 0) {
+                                return `${minutes}:${secs}`
+                            }
+                            else {
+                                return `${minutes} ${secs}`
+                            }
+                        }
+
+                    });
+
+                    const UTC2IST = (utstring) => {
+                        const date = new Date(utstring); // Convert to Date object
+                        return date.toLocaleString('en-IN', {
+                            timeZone: 'Asia/Kolkata', // IST timezone
+                            // year: 'numeric',
+                            month: 'short',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: true, // AM/PM format
+                        });
+                    }
+
+
+
+                    // Compute if all questions have been answered
+                    const haveAttemptedAll = computed(() => {
+                        console.log(quizResponse.value);
+                        return Object.values(quizResponse.value).every(q => q._have_answered)
+                    });
+
+                    // Update question data
+                    const updateUserResponse = (key, data) => {
+                        quizResponse.value[key]._answerData = { ...data };
+                        quizResponse.value[key]._have_answered = data._have_answered;
+                        quizResponse.value[key]._mark_obtained = data._mark_obtained;
+
+                        // date_has_changed.value = false;
+                    };
+
+                    const toggle_attempt_start = () => {
+                        if (props.active_mode === 'attempt_show') {
+                            // starting the quiz
+                            emit('toggleAttemptNow', 'attempt_active')
+                            // start the timer
+                            time_elapsed_since_start_ID.value = setInterval(() => {
+                                time_elapsed_since_start_seconds.value++;
+                            }, 1000);
+                        }
+                        else {
+                            // stopping the quiz in between
+                            emit('toggleAttemptNow', 'attempt_show');
+                            time_elapsed_since_start_seconds.value = 0;
+                            clearInterval(time_elapsed_since_start_ID.value)
+                        }
+                    }
+
+                    const submitAttemptQuiz = () => {
+                        // alert("updated user response")
+
+                        emit('quizAttempted',
+                            {
+                                answerData: quizResponse.value,
+                                metaData: {
+                                    upload_time: new Date().toISOString(),
+                                    time_taken: time_elapsed_since_start_seconds.value,
+                                }
+                            }
+                        )
+
+                        // clear timer of quiz start time
+                        clearInterval(time_elapsed_since_start_ID.value)
+                    };
+                    onMounted(() => {
+                        // alert("attempt Quiz mounted")
+                        time_elapsed_since_upload_seconds.value = getElapsedSeconds(props.quizMetaData.upload_time);
+                        time_elapsed_since_upload_ID.value = setInterval(() => {
+                            time_elapsed_since_upload_seconds.value++;
+                        }, 1000);
+
+
+                    });
+                    onUnmounted(() => {
+                        clearInterval(time_elapsed_since_upload_ID.value)
+
+                    })
+
+                    return {
+                        quizResponse,
+                        haveAttemptedAll,
+                        date_has_changed,
+                        UTC2IST,
+                        updateUserResponse,
+                        submitAttemptQuiz,
+                        toggle_attempt_start,
+
+                        time_elapsed_since_start_display,
+                        time_elapsed_since_upload_display
+
+                    };
+                },
+
+                template: `
+<div v-if="active_mode==='attempt_show'">
+  <div class="card shadow-lg border-0 w-100">
+    <div class="card-body">
+      <h3 class="card-title text-primary fw-bold text-center">{{ quizMetaData.reference_section }}</h3>
+
+       <div class="row">
+            <!-- Left Column -->
+            <div class="col-md-6 d-flex flex-column justify-content-center text-md-center">
+                <p class="text-muted mb-1"><strong>Created by:</strong> {{ quizMetaData.creator.display_name.value }}</p>
+                <p class="text-muted mb-1"><strong>Uploaded on:</strong> {{ UTC2IST(quizMetaData.upload_time) }}</p>
+            </div>
+            
+            <!-- Right Column -->
+            <div class="col-md-6 d-flex flex-column justify-content-center text-md-center">
+                <label class="small text-muted">Time Elapsed</label>
+                <p class="text-danger fw-bold fs-3 py-3"><strong>{{ time_elapsed_since_upload_display }}</strong></p>
+            </div>
+      </div>  
+
+      <div class="mt-3 text-center">
+        <button v-if=" quizMetaData.is_active" class="btn btn-success"
+        @click="toggle_attempt_start">
+          🚀 Attempt Now
+        </button>
+        <p v-else class="text-warning fw-bold fs-3 py-3 my-5">⚠️ Quiz is not live yet</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div v-else>
+
+    <div class="text-center py-3 bg-dark text-white fs-2 fw-bold"
+    style="cursor: pointer;">
+        <span class="user-select-none"
+        @dblclick="toggle_attempt_start">🕒 {{ time_elapsed_since_start_display }}</span>
+    </div>   
+    <label class="small text-muted">you are attempting the quiz of <strong>{{active_date.split('|')[2]}}</strong> from section <strong>{{quizMetaData.reference_section}}</strong> </label>
+  <!-- Questions List -->
+  <div v-for="(question, key) in quizQuestionData" :key="key">
+
+    <hr class="my-4 border border-1 border-dark opacity-75" />
+
+    <!-- Question Type Selection (Flex Row) -->
+    <div class="mb-2 d-flex align-items-center">
+
+      <!-- Leftmost "Q1" Display in Red Circle -->
+      <div class="d-flex align-items-center justify-content-center fs-5 border border-danger rounded-circle p-2 me-3">
+        {{key}} ({{question._qtype}})
+      </div>
+    </div>
+
+    <!-- Render Question Component-->
+    <Qwrapper
+            :std_mode="'attempt'"
+            :std_qtype="question._qtype"
+            :std_date_has_changed="date_has_changed"
+            :std_questionData="question._qdata"
+            :std_app_state="app_state"
+            @attemptedQuestion="updateUserResponse(key,$event)" />
+
+  </div>
+
+  <div class="d-flex justify-content-center">
+    <button v-if="!haveAttemptedAll" class="btn btn-danger my-5" disabled="true">
+      Please attempt all questions
+    </button>
+    <button v-else class="btn btn-success mt-y" @click="submitAttemptQuiz">
+      Submit your Answers
+    </button>
+  </div>
+  
+  <!-- <pre><code>{{ JSON.stringify(quizResponse.value, null, 2) }}</code></pre> -->
+  </div>
+            `
+
+            };
+
+            // Review Quiz
+            // active_date, 
+            const reviewQuiz = {
+                components: {
+                    Qwrapper
+                },
+                props: {
+                    active_date: {
+                        type: String,
+                        required: true
+                    },
+                    quizQuestionData: {
+                        type: Object,
+                        required: true
+                    },
+                    quizMetaData: {
+                        type: Object,
+                        required: true,
+                    },
+                    quizAnswerData: {
+                        type: Object,
+                        required: true
+                    },
+                    quizAnswerMetaData: {
+                        type: Object,
+                        required: true
+                    },
+                    app_state: {
+                        type: Object,
+                        required: true
+                    }
+                },
+                emits: ["noemission"],
+                setup(props, { emit }) {
+
+                    const date_has_changed = ref(true);
+                    // watch the change of date and update the data accordingly
+                    watch(
+                        () => props.active_date,
+                        (newVal) => {
+                            date_has_changed.value = !date_has_changed.value;
+                        },
+                        { deep: true } // Ensures nested properties are tracked
+                    );
+                    const time_taken_to_attempt = computed(() => {
+                        const seconds = props.quizAnswerMetaData.time_taken;
+                        if (seconds < 60) {
+                            return `${seconds}s`;
+                        }
+                        const minutes = Math.floor(seconds / 60);
+                        const remainingSeconds = seconds % 60;
+                        return `${minutes}m ${remainingSeconds}s`;
+                    })
+
+                    const marks_obtained = computed(() => {
+                        const obtained = Object.values(props.quizAnswerData)
+                            .reduce((sum, q) => sum + q._mark_obtained, 0)
+
+                        const max_marks = Object.values(props.quizQuestionData)
+                            .reduce((sum, q) => sum + q._qdata._max_marks, 0)
+
+                        return `${parseFloat(obtained.toFixed(2))}/${max_marks}`
+                    });
+                    const UTC2IST = (utstring) => {
+                        const date = new Date(utstring); // Convert to Date object
+                        return date.toLocaleString('en-IN', {
+                            timeZone: 'Asia/Kolkata', // IST timezone
+                            // year: 'numeric',
+                            month: 'short',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: true, // AM/PM format
+                        });
+                    };
+
+                    onMounted(() => {
+                        // alert("review Quiz mounted")
+
+                    });
+
+                    return {
+                        date_has_changed,
+                        UTC2IST,
+                        time_taken_to_attempt,
+                        marks_obtained
+                    };
+                },
+
+                template: `
+<div>
+  <div class="card shadow-lg border-0">
+    <div class="card-body">
+      <!-- Title -->
+      <h3 class="card-title text-primary fw-bold text-center">{{ quizMetaData.reference_section }}</h3>
+
+      <!-- Quiz Details -->
+      <div class="row mt-3 ">
+        <div class="col-md-6  text-center">
+          <p class="text-muted mb-1"><strong>Uploaded on:</strong> {{ UTC2IST(quizMetaData.upload_time) }}</p>
+          <p class="text-muted mb-1"><strong>Created by :</strong> {{ quizMetaData.creator.display_name.value }}</p>
+          </div>
+          <div class="col-md-6  text-center">
+            <p class="text-muted mb-1"><strong>Submitted on:</strong> {{ UTC2IST(quizAnswerMetaData.upload_time) }}</p>
+          <p class="text-muted mb-1"><strong>Duration:</strong> {{ time_taken_to_attempt }}</p>
+          <p class="text-muted mb-1"><strong>Marks Obtained:</strong> <span class="fw-bold text-success fs-5">{{
+              marks_obtained }}</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Questions List -->
+  <div v-for="(question, key) in quizQuestionData" :key="key">
+
+    <hr class="my-4 border border-2 border-dark opacity-75" />
+
+    <!-- Question Type Selection (Flex Row) -->
+    <div class="mb-2 d-flex align-items-center">
+
+      <!-- Leftmost "Q1" Display in Red Circle -->
+      <div class="d-flex align-items-center justify-content-center fs-5 border border-danger rounded-circle p-2 me-3">
+        {{key}} ({{question._qtype}})
+      </div>
+    </div>
+
+    <!-- Render Question Component Based on Type -->
+    <Qwrapper :std_qtype="question._qtype" :std_questionCreationKey="key" :std_mode="'show'"
+      :std_date_has_changed="date_has_changed" :std_questionData="question._qdata"
+      :std_answerData="quizAnswerData[key]._answerData"
+      :std_app_state="app_state"
+      />
+  </div>
+
+</div>            `
+            };
+
+            // leaderboard
+            const Leaderboard = {
+                components: {
+                },
+                props: {
+                    active_date: {
+                        type: String,
+                        required: true
+                    },
+                    quizQuestionData: {
+                        type: Object,
+                        required: true
+                    },
+                    quizMetaData: {
+                        type: Object,
+                        required: true,
+                    },
+                    quizResponses: {
+                        type: Object,
+                        required: true
+                    },
+                    app_state: {
+                        type: Object,
+                        required: true
+                    },
+                    usermap: {
+                        type: Object,
+                        required: true
+                    },
+                    dev: {
+                        type: Object,
+                        required: true
+                    }
+                },
+                emits: ["get_users", 'spin'],
+                setup(props, { emit }) {
+                    // console.log(Object.keys( props.quizMetaData))
+                    // console.log(props.quizMetaData.upload_time)
+                    // console.log(props.quizResponses)
+
+                    const UTC2IST = (utstring) => {
+                        const date = new Date(utstring); // Convert to Date object
+                        return date.toLocaleString('en-IN', {
+                            timeZone: 'Asia/Kolkata', // IST timezone
+                            // year: 'numeric',
+                            month: 'short',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: true, // AM/PM format
+                        });
+                    };
+
+                    const uploadTime = new Date(props.quizMetaData.upload_time);
+                    // const uploadTime = new Date();
+
+
+                    // Compute Attempted & Pending Users counts
+                    const attemptedUsers = computed(() =>
+                        Object.values(props.quizResponses).filter(user => user.status === "done").length
+                    );
+                    const pendingUsers = computed(() =>
+                        Object.values(props.quizResponses).filter(user => user.status === "pending").length
+                    );
+                    const pendingUserList = computed(() =>
+                        Object.entries(props.quizResponses)
+                            .filter(([key, user]) => user.status === "pending")
+                            .map(([key]) => key)
+                    );
+
+                    const totalUsers = computed(() => attemptedUsers.value + pendingUsers.value);
+                    const attemptedPercentage = computed(() => totalUsers.value ? (attemptedUsers.value / totalUsers.value) * 100 : 0);
+
+                    const pieChartStyle = computed(() => ({
+                        width: "120px",
+                        height: "120px",
+                        borderRadius: "50%",
+                        background: `conic-gradient( #28a745 ${attemptedPercentage.value}%, #dc3545 ${attemptedPercentage.value}%)`
+                    }));
+
+                    // Ranking Function
+                    const rankUsers = (responses) => {
+                        return Object.entries(responses)
+                            .filter(([_, user]) => user.status === "done")
+                            .map(([name, user]) => {
+                                const marks = Object.values(user.answerData).reduce((sum, q) => sum + q._mark_obtained, 0);
+                                return {
+                                    name: name,
+                                    marks: parseFloat(marks.toFixed(2)),
+                                    timeTaken: user.metaData.time_taken,
+                                    uploadTime: user.metaData.upload_time
+                                };
+                            })
+                            .sort((a, b) =>
+                                b.marks - a.marks || a.timeTaken - b.timeTaken || new Date(a.uploadTime) - new Date(b.uploadTime)
+                            );
+                    };
+
+                    const leaderboardWithin24H = computed(() =>
+                        rankUsers(props.quizResponses).filter(user => (new Date(user.uploadTime) - uploadTime) <= 24 * 60 * 60 * 1000)
+                    );
+
+                    const leaderboardAfter24H = computed(() =>
+                        rankUsers(props.quizResponses).filter(user => (new Date(user.uploadTime) - uploadTime) > 24 * 60 * 60 * 1000)
+                    );
+                    // ---------------------------------------------------------------------------
+                    // --------------------- reactive refs for historical data
+                    // for ui related
+                    const additional_state = ref('blank'); // blank, ever, week
+
+                    const update_additional_state = (new_state) => {
+                        // fetch_ever_data();
+                        additional_state.value = new_state;
+                    };
+                    const change_week = (direction) =>{
+                        if (direction==='prev'){}
+                        else if (direction==='next'){}
+                    }
+                    
+                    // ---------------------------UI ENDS
+                    const ever_database = ref({});
+                    ever_database.value = props.dev;
+                    const week_db = ref({});
+                    week_db.value = props.dev;
+
+                    const fetch_ever_data = () => {
+
+                        emit('spin', { showing: true, text: 'getting historical data...', mode: 'passive' })
+
+                        google.script.run.withSuccessHandler((response) => {
+                            if (response.status === 'success') {
+                                ever_database.value = response.fulldb;
+
+                                emit('spin', { showing: false, text: '', mode: 'passive' })
+
+                            }
+                            else if (response.status == 'failed') {
+                                emit('spin', { showing: false, text: '', mode: 'passive' })
+                            }
+                        }).qna_get_qnadb_2d('ever');
+
+                    }
+
+                    const everLeaderboard = computed(() => { });
+                    const weekLeaderboard = computed(() => { });
+
+                    const d2dmarks = computed(() => {
+
+                        const marksData = {};
+
+                        Object.entries(week_db.value).forEach(([dateKey, record]) => {
+                            Object.entries(record.answer_by_user).forEach(([user, response]) => {
+                                if (response.status === "done") {
+                                    if (!marksData[user]) {
+                                        marksData[user] = {};
+                                    }
+
+                                    const uploadDate = dateKey.split("|")[2]
+
+                                    if (!marksData[user][uploadDate]) {
+                                        marksData[user][uploadDate] = 0;
+                                    }
+
+                                    Object.values(response.answerData).forEach(qData => {
+                                        marksData[user][uploadDate] += qData._mark_obtained;
+                                    });
+                                }
+                            });
+                        });
+
+                        return marksData;
+                    });
+
+
+                    onMounted(() => {
+                        // alert("review Quiz mounted")
+                        emit('get_users', {})
+
+                    });
+
+                    return {
+                        UTC2IST,
+                        pieChartStyle, attemptedUsers, pendingUsers, pendingUserList,
+                        leaderboardAfter24H,
+                        leaderboardWithin24H,
+
+                        // ui related
+                        additional_state, update_additional_state,
+                        change_week,
+                        // 
+                        ever_database,
+                        d2dmarks
+                    };
+                },
+
+                template: `
+<div>
+    <div class="container mt-4">
+      <h4 class="text-center">Quiz Attempt Status</h4>
+      
+      <!-- Pie Chart -->
+      <div class="d-flex justify-content-center my-3">
+        <div class="pie-chart" :style="pieChartStyle"></div>
+      </div>
+  
+      <!-- Table for Attempted and Pending Users -->
+      <table class="table table-bordered text-center">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="text-success">Attempted</td>
+            <td>{{ attemptedUsers }}</td>
+          </tr>
+          <tr>
+            <td class="text-danger">Pending</td>
+            <td>{{ pendingUsers }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-if="pendingUsers>0">
+        <h5 class="bg-danger text-white text-center p-2 rounded mt-5">
+        devotees who are yet to attempt
+        </h5>
+        <div class="table-responsive">
+          <table class="table table-striped text-center" style="max-width: 1200px; margin: auto;">
+            <thead>
+              <tr>
+                <th>name</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr v-for="(user, index) in pendingUserList" :key="index">
+                <td class="text-center">{{ usermap[user] ? usermap[user] : user }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+  
+      <!-- Leaderboard Tables -->
+      <div v-if="leaderboardWithin24H.length>0">
+        <h5 class="bg-primary text-white text-center p-2 rounded mt-5">
+        Leaderboard (Attempted within 24 hours)</h5>
+        <div class="table-responsive">
+          <table class="table table-striped text-center" style="max-width: 1200px; margin: auto;">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>Marks</th>
+                <th>Time Taken(s)</th>
+                <th>Upload Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(user, index) in leaderboardWithin24H" :key="user.name">
+                <td>{{ index + 1 }}</td>
+                <td>{{ usermap[user.name] ? usermap[user.name] : user.name }}</td>
+                <td>{{ user.marks }}</td>
+                <td>{{ user.timeTaken }}</td>
+                <td>{{ UTC2IST(user.uploadTime) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+        </div>
+
+      <div v-if="leaderboardAfter24H.length>0" >
+        <h5 class="bg-warning text-dark text-center p-2 rounded mt-5">
+        Leaderboard (Attempted after 24 hours)</h5>
+        <div class="table-responsive">
+          <table class="table table-striped text-center" style="max-width: 1200px; margin: auto;">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>Marks</th>
+                <th>Time Taken(s)</th>
+                <th>Upload Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(user, index) in leaderboardAfter24H" :key="user.name">
+                <td>{{ index + 1 }}</td>
+                <td>{{ usermap[user.name] ? usermap[user.name] : user.name }}</td>
+                <td>{{ user.marks }}</td>
+                <td>{{ user.timeTaken }}</td>
+                <td>{{ UTC2IST(user.uploadTime) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+        </div>
+        <hr class="my-2 border border-2 border-dark opacity-75" />
+        <!--
+        <pre><code>{{ JSON.stringify(d2dmarks, null, 2) }}</code></pre>-->
+        <!-- -------------------------------- more leaderboard -->
+        <!--
+        <div class="d-flex justify-content-center">
+            <div v-if="additional_state==='blank'">
+                <button class="btn btn-primary" @click="update_additional_state('week')">
+                    Show More
+                </button>
+
+            </div>
+
+            <div v-else class="d-flex justify-content-center mt-3">
+                <button class="btn btn-secondary mx-2" @click="update_additional_state('ever')"
+                    :class="{'border border-3 border-info': additional_state === 'ever'}">Ever</button>
+                <button class="btn btn-secondary mx-2" @click="update_additional_state('week')"
+                    :class="{'border border-3 border-info': additional_state === 'week'}">Week</button>
+            </div>
+            
+            
+            </div>
+            <div v-if="additional_state==='week'" class="d-flex justify-content-center mt-3" >
+                <button class="btn btn-outline-secondary mx-2" @click="change_week('prev')">Previous week</button>
+                <button class="btn btn-outline-secondary mx-2" @click="change_week('next')">Next week</button>
+            </div>
+            -->
+    </div>
+</div>            `
+            };
+
+
+            // main app
+            const app = Vue.createApp({
+                components: {
+                    LoginHandler,
+                    DateSelector,
+                    createQuiz,
+                    attemptQuiz,
+                    reviewQuiz,
+                    Spinner,
+                    Leaderboard
+                },
+                setup() {
+
+                    const one_time_run_tracker = ref({
+                        updating_q_creator_access: false,
+                        set_login_to_last_quiz: false
+                    })
+
+                    // page state related things
+                    const is_creating_quiz = ref(false);
+                    const active_mode = ref('attempt_show');
+                    // attempt_show (show the quiz details)
+                    // attempt_active (attempting the quiz details)
+                    // show (see already answered quiz)
+                    // db_daily (dashboard of the selected day)
+                    const app_state_info = ref({
+                        app_version: null,
+                        allowed_quiz_creation: false,
+
+                        is_busy: false,
+                        busy_msg: "",
+
+                        is_mobile: false,
+                        is_guest_mode: false
+                    })
+                    // Function to detect device type
+                    const updateDeviceType = () => {
+                        app_state_info.value.is_mobile =
+                            window.matchMedia("(max-width: 820px)").matches
+                        // &&("ontouchstart" in window || navigator.maxTouchPoints > 0);
+                    };
+
+
+                    // userinfo and spinner
+                    const userInfo = ref({});
+
+                    const spinnerStatus = ref({
+                        showing: false,
+                        text: ""
+                    });
+
+                    // ----------------------------------------------------------
+                    // ------------------DATABASE RELATED------------------------
+                    const qnaDB = ref({
+
+                    }); // full database in app
+
+                    const activeDate = ref(''); // active date selected.
+
+                    // ----------------this is for client side storage
+                    const DB_NAME = "MyDatabase";
+                    const DB_STORE = "DataStore";
+                    const DB_VERSION = 1; // Change this to force a database reset
+                    app_state_info.value.app_version = DB_VERSION;
+
+                    // Open IndexedDB
+                    const openDB = async () => {
+                        return new Promise((resolve, reject) => {
+                            const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                            request.onupgradeneeded = (event) => {
+                                const db = event.target.result;
+                                Array.from(db.objectStoreNames).forEach((store) => db.deleteObjectStore(store)); // Clear old stores
+                                db.createObjectStore(DB_STORE); // Create a new store
+                                console.log("Created new IndexedDB");
+                            };
+
+                            request.onsuccess = () => resolve(request.result);
+                            request.onerror = () => reject("Error opening IndexedDB");
+                        });
+                    };
+
+                    // Store database object for active user
+                    const store_db = async (active_db) => {
+                        const active_username = userInfo.value.username.value; // Assume userInfo is reactive
+                        const db = await openDB();
+                        return new Promise((resolve, reject) => {
+                            const transaction = db.transaction(DB_STORE, "readwrite");
+                            const store = transaction.objectStore(DB_STORE);
+                            store.put(active_db, active_username); // Store data under active user's key
+                            console.log(`Saved data for ${active_username} to IndexedDB`);
+
+                            transaction.oncomplete = () => resolve("Database stored successfully");
+                            transaction.onerror = () => reject("Failed to store database");
+                        });
+                    };
+
+                    // Load database object for active user
+                    const load_database = async () => {
+                        const active_username = userInfo.value.username.value; // Assume userInfo is reactive
+                        const db = await openDB();
+                        return new Promise((resolve, reject) => {
+                            const transaction = db.transaction(DB_STORE, "readonly");
+                            const store = transaction.objectStore(DB_STORE);
+                            const request = store.get(active_username); // Load data only for active user
+
+                            request.onsuccess = () => {
+                                if (request.result) {
+                                    console.log(`Loaded data for ${active_username} from IndexedDB`);
+                                    resolve(request.result);
+                                } else {
+                                    console.log(`No data found for ${active_username}, resetting DB`);
+                                    clear_old_data(); // Clear old data if the user is new
+                                    resolve({}); // Return empty object
+                                }
+                            };
+
+                            request.onerror = () => reject("Failed to load database");
+                        });
+                    };
+
+                    // Clear all old user data
+                    const clear_old_data = async () => {
+                        const db = await openDB();
+                        return new Promise((resolve, reject) => {
+                            const transaction = db.transaction(DB_STORE, "readwrite");
+                            const store = transaction.objectStore(DB_STORE);
+                            store.clear(); // Delete all stored data
+                            console.log("Cleared old IndexedDB data");
+
+                            transaction.oncomplete = () => resolve("Old data cleared");
+                            transaction.onerror = () => reject("Failed to clear old data");
+                        });
+                    };
+
+
+
+
+                    const fetch_data_from_cloud = () => {
+
+                        updateSpin({
+                            mode: 'passive',
+                            showing: true,
+                            text: "updating database..."
+                        })
+                        google.script.run.withSuccessHandler((response) => {
+                            if (response.status === 'success') {
+                                qnaDB.value = response.fulldb;
+
+                                if (!one_time_run_tracker.value.set_login_to_last_quiz) {
+                                    activeDate.value = active_DateList.value[active_DateList.value.length - 1]
+                                    one_time_run_tracker.value.set_login_to_last_quiz = true;
+                                }
+
+                                if (response.creator === userInfo.value.username.value) {
+                                    app_state_info.value.allowed_quiz_creation = true;
+                                }
+                                one_time_run_tracker.value.updating_q_creator_access = true;
+
+                                store_db(response.fulldb)
+
+                                updateSpin({
+                                    mode: 'passive',
+                                    showing: false,
+                                    text: ""
+                                })
+
+
+                            }
+                            else if (response.status == 'failed') {
+                                // some error  
+                                updateSpin({
+                                    mode: 'passive',
+                                    showing: true,
+                                    text: "some error occured. please refresh"
+                                })
+                            }
+                        }).qna_get_qnadb_2d('recent');
+
+                    };
+
+                    const existing_usermap = ref({});
+                    const get_existing_usermap = () => {
+                        if (Object.keys(existing_usermap.value).length > 0 || app_state_info.value.is_guest_mode) {
+                            // no need to fetch
+                        }
+                        else {
+                            // fetch from database
+
+
+                            updateSpin({
+                                mode: 'active',
+                                showing: true,
+                                text: "getting dashboard"
+                            })
+                            google.script.run.withSuccessHandler((response) => {
+                                existing_usermap.value = Object.entries(response.data)
+                                    .reduce((acc, [userId, data]) => {
+                                        acc[userId] = data.display_name.value;
+                                        return acc;
+                                    }, {});
+                                // response.data
+                                // .map(([username, userdata]) => {
+                                //   return {
+                                //     username: userdata.display_name.value
+                                //     }
+                                //   });
+
+
+                                updateSpin({
+                                    mode: 'active',
+                                    showing: false,
+                                    text: ""
+                                })
+                                // console.log(existing_usermap.value)
+
+                            }).login_get_all_users(false)
+                        }
+                    };
+
+                    // ------------------------------------------
+                    // ------------derived data from full data---
+
+                    // active quiz question
+                    const active_QuizQuestion = computed(() => {
+                        // console.log("--------------------------")
+                        // console.log(qnaDB.value)
+                        // console.log("--------------------------")
+                        if (Object.hasOwn(qnaDB.value, activeDate.value)) {
+                            return {
+                                draft: qnaDB.value[activeDate.value].question_data,
+                                database_row: qnaDB.value[activeDate.value].edit_row,
+                                draft_exists: true
+                            }
+                        }
+                        else {
+                            return {
+                                draft: {},
+                                draft_exists: false
+
+                            }
+                        }
+                    });
+
+                    // active quiz answer
+                    const active_QuizAnswer = computed(() => {
+                        if (Object.hasOwn(qnaDB.value, activeDate.value)) {
+                            return {
+                                answer: qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username?.value],
+                                all_answers: qnaDB.value[activeDate.value].answer_by_user,
+                                answer_exists: true
+                            }
+                        }
+                        else {
+                            return {
+                                answer_exists: false
+                            }
+                        }
+
+                    });
+
+                    // whether a quiz is locked for editing
+                    const quiz_is_locked = computed(() => {
+                        return Object.values(active_QuizAnswer.value).some(user => user.status === "done");
+                    });
+
+                    // list of dates
+                    const active_DateList = computed(() => {
+                        return Object.keys(qnaDB.value).sort((a, b) => {
+                            const numA = parseInt(a.split('|')[0], 10);
+                            const numB = parseInt(b.split('|')[0], 10);
+                            return numA - numB;  // Ascending order
+                        });
+                    });
+
+                    // date -> answered mapping for 
+                    const haveAnswered4 = computed(() => {
+                        const username = userInfo.value.username?.value;
+                        const statusMap = {};
+
+                        for (const date in qnaDB.value) {
+                            statusMap[date] = qnaDB.value[date].answer_by_user[username].status;
+                        }
+                        // also update the active state
+                        if (['db_daily', 'attempt_active'].includes(active_mode.value)) { }
+                        else {
+                            // update only if it is not in dashboard mode
+                            active_mode.value = statusMap[activeDate.value] === 'pending' ? 'attempt_show' : 'show'
+                        }
+                        return statusMap;
+                    })
+
+
+                    //-------------------------------------------------------
+                    // various handlers to respond to emits of components
+
+                    const updateQuizCreatingMode = (new_value) => {
+                        is_creating_quiz.value = new_value;
+                    }
+
+                    const updateUserInfo = (newuserinfo) => {
+                        userInfo.value = newuserinfo;
+
+                        // to do list after login
+                        if (Object.keys(userInfo.value).length > 0) {
+                            // update if it is a guest mode
+                            if (userInfo.value.username.value === 'guest' && userInfo.value.password.value === 'guest') {
+                                app_state_info.value.is_guest_mode = true;
+                            }
+
+                            load_database().then((localdata) => {
+                                qnaDB.value = localdata;
+                                // do not fetch from if it is in guest mode
+                                if (app_state_info.value.is_guest_mode) { }
+                                else {
+                                    fetch_data_from_cloud();
+                                }
+                            });
+                        }
+                    };
+
+                    const updateActiveDate = (new_date) => {
+                        activeDate.value = new_date;
+                    };
+
+                    const updateActiveQuiz = (updatedQuizQuestion) => {
+                        const newly_created_quiz = JSON.parse(JSON.stringify(updatedQuizQuestion));
+                        newly_created_quiz._metaData = {
+                            ...newly_created_quiz._metaData,
+                            upload_time: new Date().toISOString(),
+                            creator: userInfo.value
+                        };
+
+                        updateSpin({
+                            mode: 'active',
+                            showing: true,
+                            text: "submitting the quiz"
+                        });
+
+                        if (app_state_info.value.is_guest_mode) {
+
+                            // update the local database
+                            qnaDB.value[activeDate.value] = {
+                                question_data: newly_created_quiz,
+                                answer_by_user: {},
+                                edit_row: 0
+                            }
+                            // console.log(Object.keys(qnaDB.value))
+                            qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value] = {
+                                status: "pending",
+                            }
+                            setTimeout(() => {
+                                // Store the database locally
+                                store_db(JSON.parse(JSON.stringify(qnaDB.value)));
+                                updateSpin({
+                                    mode: 'active',
+                                    showing: false,
+                                    text: ""
+                                });
+                            }, 1500);
+                            // store the database locally
+
+                            return
+                            // in guest mode do not run the further functions
+                        }
+
+
+                        if (active_QuizQuestion.value.draft_exists) {
+                            // modifying a quiz
+
+                            const existing_row = active_QuizQuestion.value.database_row;
+
+                            google.script.run.withSuccessHandler((response) => {
+                                if (response.status === 'success') {
+
+                                    // update the local database
+                                    qnaDB.value[activeDate.value] = {
+                                        question_data: newly_created_quiz,
+                                        answer_by_user: {},
+                                        edit_row: 0
+                                    }
+                                    // console.log(Object.keys(qnaDB.value))
+                                    qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value] = {
+                                        status: "pending",
+                                    }
+                                    updateSpin({
+                                        mode: 'active',
+                                        showing: false,
+                                        text: ""
+                                    });
+
+                                    // reload the data
+                                    setTimeout(() => {
+                                        fetch_data_from_cloud();
+                                    }, 500);
+
+                                }
+                                else if (response.status == 'failed') {
+                                    // some error  
+                                    updateSpin({
+                                        mode: 'active',
+                                        showing: false,
+                                        text: ""
+                                    })
+                                }
+                            }).qna_modify_quiz(JSON.stringify(newly_created_quiz), existing_row);
+                        }
+
+                        else {
+                            // uploading a new quiz
+                            google.script.run.withSuccessHandler((response) => {
+                                if (response.status === 'success') {
+
+                                    // update the local database
+                                    qnaDB.value[activeDate.value] = {
+                                        question_data: newly_created_quiz,
+                                        answer_by_user: {},
+                                        edit_row: 0
+                                    }
+                                    qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value] = {
+                                        status: "pending",
+                                    }
+                                    updateSpin({
+                                        mode: 'active',
+                                        showing: false,
+                                        text: ""
+                                    });
+
+
+                                    // reload the whole data
+                                    setTimeout(() => {
+                                        fetch_data_from_cloud();
+                                    }, 1000);
+                                    // alert("successfully submitted")
+                                }
+                                else if (response.status == 'failed') {
+                                    // some error  
+                                    updateSpin({
+                                        mode: 'active',
+                                        showing: false,
+                                        text: ""
+                                    })
+                                }
+                            }).qna_upload_question(activeDate.value, JSON.stringify(newly_created_quiz));
+
+                        }
+                    };
+
+                    const updateActiveRespose = (updatedQuizAnswer) => {
+                        const quizAnswer = JSON.parse(JSON.stringify(updatedQuizAnswer));
+                        // console.log(quizAnswer)
+                        updateSpin({
+                            mode: 'active',
+                            showing: true,
+                            text: "submitting your answers"
+                        })
+
+
+                        if (app_state_info.value.is_guest_mode) {
+                            // update the local data
+                            qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value] = {
+                                status: "done",
+                                ...quizAnswer,
+                            }
+                            active_mode.value = 'show';
+
+                            // reload the data
+                            setTimeout(() => {
+                                store_db(JSON.parse(JSON.stringify(qnaDB.value)));
+                                active_mode.value = 'show';
+                                updateSpin({
+                                    mode: 'active',
+                                    showing: false,
+                                    text: ""
+                                })
+                            }, 1500);
+                            return
+                        }
+
+                        const existing_row = active_QuizQuestion.value.database_row;
+                        const answer_data_usercolumn = userInfo.value.db_col.value;
+
+                        google.script.run.withSuccessHandler((response) => {
+                            if (response.status === 'success') {
+
+                                // upon successful submission update the local data also
+                                // to have fast experience
+                                qnaDB.value[activeDate.value].answer_by_user[userInfo.value.username.value] = {
+                                    status: "done",
+                                    ...quizAnswer,
+                                }
+                                active_mode.value = 'show';
+
+                                updateSpin({
+                                    mode: 'active',
+                                    showing: false,
+                                    text: ""
+                                })
+                                // reload the data
+                                setTimeout(() => {
+                                    fetch_data_from_cloud();
+                                }, 1000);
+                                active_mode.value = 'show'
+
+                            }
+                            else if (response.status == 'failed') {
+                                // some error  
+                                updateSpin({
+                                    mode: 'active',
+                                    showing: false,
+                                    text: ""
+                                })
+                            }
+                        }).qna_upload_to_cell(JSON.stringify(quizAnswer), existing_row, answer_data_usercolumn);
+                    };
+
+                    const updateSpin = (new_spin_status) => {
+                        if (new_spin_status.mode === 'passive') {
+                            // update for top banner
+                            app_state_info.value.is_busy = new_spin_status.showing;
+                            app_state_info.value.busy_msg = new_spin_status.text;
+                        }
+                        else if (new_spin_status.mode === 'active') {
+                            spinnerStatus.value.showing = new_spin_status.showing;
+                            spinnerStatus.value.text = new_spin_status.text;
+                        }
+                    };
+
+
+                    // on mount
+                    onMounted(() => {
+
+                        updateDeviceType();
+                        window.addEventListener("resize", updateDeviceType);
+
+                    });
+                    // Cleanup on unmount
+                    onUnmounted(() => {
+                        window.removeEventListener("resize", updateDeviceType);
+                    });
+
+
+                    return {
+                        spinnerStatus,
+                        userInfo,
+                        app_state_info,
+                        activeDate,
+                        active_DateList, haveAnswered4,
+                        active_QuizQuestion,
+                        active_QuizAnswer,
+                        is_creating_quiz,
+                        active_mode,
+                        quiz_is_locked,
+                        qnaDB,
+
+                        updateUserInfo,
+                        updateQuizCreatingMode,
+                        updateActiveDate,
+                        updateActiveQuiz,
+                        updateActiveRespose,
+                        updateSpin,
+                        get_existing_usermap,
+                        existing_usermap
+                    };
+                },
+
+                // main app template
+                template: `
+<Spinner :is_active="spinnerStatus.showing" :display_text="spinnerStatus.text" />
+<!--<pre><code>{{ JSON.stringify(qnaDB, null, 2) }}</code></pre>-->
+<LoginHandler :is_edit_mode="is_creating_quiz"
+    :allow_overlay="active_mode!=='attempt_active'"
+    :app_state_info="app_state_info"
+    @update_user_creds="updateUserInfo"
+    @spin="updateSpin"
+    @create_quiz="updateQuizCreatingMode" />
+
+<div v-if="Object.keys(userInfo).length>0">
+    <!-- basically if user have logged in -->
+
+    <div class="mt-4">
+        <!-- Choose the date -->
+        <DateSelector v-show="active_mode!='attempt_active'"
+            :dateList="active_DateList" 
+            :statusMap="haveAnswered4"
+            :activeDate="activeDate"
+            :showNewPicker="is_creating_quiz"
+            :app_state="app_state_info"
+            @dateClicked="updateActiveDate" />
+
+        <div v-if="activeDate">
+            <!-- for changing various modes -->
+
+            <div v-if="!(active_mode === 'attempt_active' || is_creating_quiz)" class="d-flex overflow-auto flex-grow-1 mt-2">
+                
+                <!-- for leaderboard -->
+                <div>
+                    <button
+                        class="btn btn-outline-primary me-2" 
+                        :class="{'btn-primary text-white': active_mode === 'db_daily'}"
+                        @click="active_mode='db_daily'"> Dashboard </button>
+                </div>
+                
+                <!-- if already answered then show their answer -->
+                <div v-if="haveAnswered4[activeDate]==='done'">
+                    <button class="btn btn-outline-primary me-2" 
+                    :class="{'btn-primary text-white': active_mode === 'show'}"
+                    @click="active_mode='show'"> Show Your Answer </button>
+                </div>
+
+                <!-- otherwise show the preview-of attempt-->
+                <div  v-else>
+                    <button  class="btn btn-outline-primary me-2"
+                    :class="{'btn-primary text-white': active_mode === 'attempt_show'}"
+                        @click="active_mode='attempt_show'"> Attempt Now </button>
+                </div>
+
+            </div>
+
+            <hr class="my-4 border border-2 border-dark opacity-75" />
+
+            <!-- Create quiz -->
+            <div v-if="is_creating_quiz">
+                <h3 
+                    class="mt-2 text-center bg-dark-subtle py-2 fw-bold"
+                    :class="{
+                        'text-primary': active_QuizQuestion.draft_exists && !quiz_is_locked,
+                        'text-success': !active_QuizQuestion.draft_exists && !quiz_is_locked,
+                        'text-danger': quiz_is_locked
+                    }"> 
+                    {{ quiz_is_locked ? '❌ Cannot edit (already answered by some)' : (active_QuizQuestion.draft_exists ? 'Modifying quiz for' : 'Creating quiz for') }} 
+                    {{ activeDate.split('|')[2] }}
+                </h3>
+
+                <!-- <pre><code>{{ JSON.stringify(active_QuizQuestion, null, 2) }}</code></pre> -->
+                <createQuiz
+                    :active_date="activeDate"
+                    :quizDraftData="active_QuizQuestion"
+                    :is_locked="quiz_is_locked"
+                    :app_state="app_state_info"
+                    @newQuizCreated="updateActiveQuiz"
+                />
+            </div>
+
+
+            <!-- Attempt quiz  -->
+            <div v-else-if="active_mode==='attempt_show' || active_mode==='attempt_active'">
+                
+                <attemptQuiz
+                    :active_mode="active_mode"
+                    :active_date="activeDate"
+                    :quizQuestionData="active_QuizQuestion.draft._qData"
+                    :quizMetaData="active_QuizQuestion.draft._metaData"
+                    :app_state="app_state_info"
+                    @toggleAttemptNow="active_mode=$event"
+                    @quizAttempted="updateActiveRespose"
+                />
+
+
+            </div>
+
+            <!-- Pre-view quiz -->
+            <div v-else-if="active_mode==='show'">
+                <!--<pre><code>{{ JSON.stringify(active_QuizAnswer, null, 2) }}</code></pre>-->
+                <reviewQuiz
+                    :active_date="activeDate" 
+                    :quizQuestionData="active_QuizQuestion.draft._qData"
+                    :quizMetaData="active_QuizQuestion.draft._metaData"
+                    :quizAnswerData="active_QuizAnswer.answer.answerData"
+                    :app_state="app_state_info"
+                    :quizAnswerMetaData="active_QuizAnswer.answer.metaData"
+                    />
+            </div>
+
+            <!-- Leaderboard -->
+            <div v-else-if="active_mode==='db_daily'">
+              <Leaderboard
+                      :dev="qnaDB"
+                      :active_date="activeDate"
+                      :quizQuestionData="active_QuizQuestion.draft._qData"
+                      :quizMetaData="active_QuizQuestion.draft._metaData"
+                      :quizResponses="active_QuizAnswer.all_answers"
+                      :usermap="existing_usermap"
+                      :app_state="app_state_info"
+                      @spin="updateSpin"
+                      @get_users="get_existing_usermap"
+                  />
+
+            </div>
+        </div>
+
+        <div v-else>
+            <h3 class="mt-2 text-center text-danger"> Please Select a date first </h3>
+        </div>
+
+
+    </div>
+    <div class="py-5"> </div>
+    <div class="py-5"> </div>
+    <div class="py-5"> </div>
+</div>
+                `
+            });
+            app.mount('#app')
+
+        </script>
+</body>
+
+</html>

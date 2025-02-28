@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SPORT</title>
+    <link rel="icon" type="image/png" href="assets/images/favicon-bulb.png">
     <style>
         /* Global Reset */
         * {
@@ -12,7 +14,8 @@
             box-sizing: border-box;
         }
 
-        body, html {
+        body,
+        html {
             width: 100%;
             height: 100%;
             overflow: hidden;
@@ -47,15 +50,19 @@
 
         .quote-author {
             font-size: 1.8rem;
-            color: #007bff; /* Bootstrap primary color */
+            color: #007bff;
+            /* Bootstrap primary color */
             font-style: italic;
         }
 
         /* Swipe-up animation when hiding */
         .hide-quote {
-            transform: translateY(-100%);
             opacity: 0;
+            transition: transform 0.6s ease-in-out, opacity 0.6s ease-in-out;
         }
+
+
+
 
         /* Loading Spinner */
         .spinner {
@@ -69,8 +76,13 @@
         }
 
         @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* Initially position iframe above viewport */
@@ -79,14 +91,13 @@
             height: 100vh;
             border: none;
             position: absolute;
-            top: -100vh; /* Start above the screen */
-            left: 0;
             z-index: 1;
             visibility: hidden;
-            transition: top 1s ease-in-out; /* Smooth slide-down animation */
+            transition: top 1s ease-in-out, left 1s ease-in-out;
         }
     </style>
 </head>
+
 <body>
     <!-- Quote Display -->
     <div class="quote-container" id="quote-container">
@@ -96,10 +107,9 @@
     </div>
 
     <!-- Fullscreen Iframe -->
-    <iframe id="app-frame" 
-            src="https://script.google.com/macros/s/AKfycbwiJzd8sPUTNl83DW4_YCse-VU9eBZMmKb7MJyGpQLGNKpfANXO9DElXN1rmsUlTgu7ew/exec" 
-            allowfullscreen 
-            onload="hideQuote()">
+    <iframe id="app-frame"
+        src="https://script.google.com/macros/s/AKfycbxw7hwn11bbdvrb-8IIMQmJQD_UT9nCGymXkJyxHNPtNQAvo_4oDF3TkzkGpJe0A_cECQ/exec"
+        allowfullscreen onload="hideQuote()">
     </iframe>
 
     <script>
@@ -109,7 +119,7 @@
                 if (storedQuotes) {
                     return JSON.parse(storedQuotes);
                 }
-                let response = await fetch("quotedb.json");
+                let response = await fetch("./assets/quotedb.json");
                 if (!response.ok) throw new Error("File not found");
                 let quotes = await response.json();
                 localStorage.setItem("quotes", JSON.stringify(quotes));
@@ -131,17 +141,39 @@
             let quoteContainer = document.getElementById("quote-container");
             let appFrame = document.getElementById("app-frame");
 
-            quoteContainer.classList.add("hide-quote"); // Swipe up the quote
+            // Define possible hiding directions
+            const directions = [
+                { quote: "translateY(-100%)", appStart: "top: 100vh; left: 0;" },  // Up → Down
+                { quote: "translateY(100%)", appStart: "top: -100vh; left: 0;" },  // Down → Up
+                { quote: "translateX(-100%)", appStart: "top: 0; left: 100vw;" },  // Left → Right
+                { quote: "translateX(100%)", appStart: "top: 0; left: -100vw;" }   // Right → Left
+            ];
+
+            // Pick a random direction
+            let randomDirection = directions[Math.floor(Math.random() * directions.length)];
+
+            // Hide quote with random direction
+            quoteContainer.style.transform = randomDirection.quote;
+            quoteContainer.style.opacity = "0";
 
             setTimeout(() => {
                 quoteContainer.style.display = "none";
+
+                // Set app position to the opposite start position
+                appFrame.style = randomDirection.appStart;
                 appFrame.style.visibility = "visible";
-                appFrame.style.top = "0"; // Slide down the iframe
+
+                setTimeout(() => {
+                    appFrame.style.top = "0";
+                    appFrame.style.left = "0";
+                }, 50);  // Ensures transition applies smoothly
             }, 600);
         }
+
 
         // Show quote on load
         showRandomQuote();
     </script>
 </body>
+
 </html>
